@@ -1,0 +1,23 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build MNIST Project",
+            "type": "shell",
+            "command": "clang++ -std=c++17 -Wall src/*.cpp -Iinclude $(pkg-config --cflags --libs opencv4) -o main.out",
+            "group": {
+                "kind": "build"
+            },
+            "problemMatcher": ["$gcc"]
+        },
+        {
+            "label": "Build Tests",
+            "type": "shell",
+            "command": "clang++ -std=c++17 -Wall tests/*.cpp $(find src -name '*.cpp' ! -name 'main.cpp') -Iinclude $(pkg-config --cflags --libs opencv4) -o tests.out",
+            "group": {
+                "kind": "build"
+            },
+            "problemMatcher": ["$gcc"]
+        }
+    ]
+}
