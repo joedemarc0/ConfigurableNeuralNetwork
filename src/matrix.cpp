@@ -5,227 +5,254 @@
 #include <cmath>
 
 
-// Constructors
+// Matrix Class Constructors
 Matrix::Matrix() : rows(0), cols(0) {}
 
-Matrix::Matrix(
-    size_t rows,
-    size_t cols
-) : rows(rows),
-    cols(cols)
-{
-    data.resize(rows, std::vector<double>(cols, 0.0));
+Matrix::Matrix(size_t rows, size_t cols)
+    : rows(rows), cols(cols), data(rows * cols, 0.0) {}
+
+Matrix::Matrix(size_t rows, size_t cols, double value)
+    : rows(rows), cols(cols), data(rows * cols, value) {}
+
+Matrix::Matrix(Matrix&& other) noexcept
+    : rows(other.rows), cols(other.cols), data(std::move(other.data)) {
+    other.rows = other.cols = 0;
 }
 
-Matrix::Matrix(
-    size_t rows,
-    size_t cols,
-    double value
-) : rows(rows),
-    cols(cols)
-{
-    data.resize(rows, std::vector<double>(cols, value));
-}
 
-Matrix::Matrix(
-    const Matrix& other
-) : data(other.data),
-    rows(other.rows),
-    cols(other.cols)
-{}
-
-
-// Assignment operator
-Matrix& Matrix::operator=(const Matrix& other) {
+// Assignment Operators
+Matrix& Matrix::operator=(Matrix&& other) noexcept {
     if (this != &other) {
-        data = other.data;
         rows = other.rows;
         cols = other.cols;
+        data = std::move(other.data);
+        other.rows = other.cols = 0;
     }
 
     return *this;
 }
 
-// Element Access
+
+// Element Access Operators
 double& Matrix::operator()(size_t row, size_t col) {
     if (row >= rows || col >= cols) {
-        throw std::out_of_range("Matri index out of range");
+        throw std::out_of_range("Matrix Operator (): Matrix index out of range");
     }
 
-    return data[row][col];
+    return data[row * cols + col];
 }
 
 const double& Matrix::operator()(size_t row, size_t col) const {
     if (row >= rows || col >= cols) {
-        throw std::out_of_range("Matrix index out of range");
+        throw std::out_of_range("Matrix Operator (): Matrix index out of range");
     }
 
-    return data[row][col];
+    return data[row * cols + col];   
 }
 
-// Matrix operations
+
+// Matrix Operations
 Matrix Matrix::operator+(const Matrix& other) const {
-    if (rows != other.rows || cols != other.cols) {
-        throw std::invalid_argument("Matrix dimensions do not match");
+    const double* __restrict a = data.data();
+    const double* __restrict b = other.data.data();
+
+    if (matchDim(*this, other)) {
+        Matrix result(rows, cols);
+        double* __restrict r = result.data.data();
+        for (size_t i = 0; i < data.size(); ++i) r[i] = a[i] + b[i];
+        return result;
+    } else if (rows == other.rows && other.cols == 1) {
+        Matrix result(rows, cols);
+        double* __restrict r = result.data.data();
+
+        for (size_t row = 0; row < rows; ++row) {
+            const double bias = b[row];
+            const size_t base = row * cols;
+            for (size_t col = 0; col < cols; ++col) r[base + col] = a[base + col] + bias;
+        }
+
+        return result;
     }
 
-    Matrix result(rows, cols);
-    for (size_t i = 0; i < rows; ++i) {
-        for (size_t j = 0; j < cols; ++j) {
-            result(i, j) = data[i][j] + other(i, j);
-        }
-    }
-    return result;
+    throw std::invalid_argument("Matrix Operator (+): Matrix dimensions must match");
 }
 
 Matrix Matrix::operator-(const Matrix& other) const {
-    if (rows != other.rows || cols != other.cols) {
-        throw std::invalid_argument("Matrix dimensions do not match");
+    if (!matchDim(*this, other)) {
+        throw std::invalid_argument("Matrix Operator (-): Matrix dimensions must match");
     }
 
     Matrix result(rows, cols);
-    for (size_t i = 0; i < rows; ++i) {
-        for (size_t j = 0; j < cols; ++j) {
-            result(i, j) = data[i][j] - other(i, j);
-        }
-    }
+    const double* __restrict a = data.data();
+    const double* __restrict b = other.data.data();
+    double* __restrict r = result.data.data();
+    for (size_t i = 0; i < data.size(); ++i) r[i] = a[i] - b[i];
     return result;
 }
 
 Matrix Matrix::operator*(const Matrix& other) const {
     if (cols != other.rows) {
-        throw std::invalid_argument("Invalid dimensions for matrix multiplication");
+        throw std::invalid_argument("Matrix Operator (*): Matrix dimensions must be valid");
     }
 
     Matrix result(rows, other.cols);
-    for (size_t i = 0; i << rows; ++i) {
-        for (size_t j = 0; j << other.cols; ++j) {
-            for (size_t k = 0; k < cols; ++k) {
-                result(i, j) += data[i][k] * other(k, j);
-            }
+    const double* __restrict a = data.data();
+    const double* __restrict b = other.data.data();
+    double* __restrict r = result.data.data();
+
+    for (size_t i = 0; i < rows; ++i) {
+        const double* a_row = a + i * cols;
+        double* r_row = r + i * other.cols;
+
+        for (size_t k = 0; k < cols; ++k) {
+            const double a_ik = a_row[k];
+            const double* b_row = b + k * other.cols;
+            for (size_t j = 0; j < other.cols; ++j) r_row[j] += a_ik * b_row[j];
         }
     }
+
     return result;
 }
 
-// Scalar operations
+
+// Scalar Operations
 Matrix Matrix::operator*(double scalar) const {
     Matrix result(rows, cols);
-    for (size_t i = 0; i < rows; ++i) {
-        for (size_t j = 0; j < cols; ++j) {
-            result(i, j) = data[i][j] * scalar;
-        }
-    }
+    const double* __restrict a = data.data();
+    double* __restrict r = result.data.data();
+    for (size_t i = 0; i < data.size(); ++i) r[i] = a[i] * scalar;
     return result;
 }
 
 Matrix Matrix::operator/(double scalar) const {
-    if (scalar == 0.0) {
-        throw std::invalid_argument("Division by zero");
+    if (std::abs(scalar) < 1e-12) {
+        throw std::invalid_argument("Matrix Scalar Division: Divide by zero error");
     }
+
     return *this * (1.0 / scalar);
 }
 
-// In-place operations
+
+// In-place Matrix Operations
 Matrix& Matrix::operator+=(const Matrix& other) {
-    *this = *this + other;
+    if (!matchDim(*this, other)) {
+        throw std::invalid_argument("Matrix Operator (+=): Matrix dimensions must match");
+    }
+
+    double* __restrict a = data.data();
+    const double* __restrict b = other.data.data();
+    for (size_t i = 0; i < data.size(); ++i) a[i] += b[i];
     return *this;
 }
 
 Matrix& Matrix::operator-=(const Matrix& other) {
-    *this = *this - other;
+    if (!matchDim(*this, other)) {
+        throw std::invalid_argument("Matrix Operator (-=): Matrix dimensions must match");
+    }
+
+    double* __restrict a = data.data();
+    const double* __restrict b = other.data.data();
+    for (size_t i = 0; i < data.size(); ++i) a[i] -= b[i];
     return *this;
 }
 
+
+// In-place Scalar Operations
 Matrix& Matrix::operator*=(double scalar) {
-    for (size_t i = 0; i < rows; ++i) {
-        for (size_t j = 0; j < cols; ++j) {
-            data[i][j] *= scalar;
-        }
-    }
+    for (double &v : data) v *= scalar;
     return *this;
 }
 
-bool Matrix::operator==(const Matrix& other) const {
-    if (rows != other.getRows() || cols != other.getCols()) {
-        return false;
+Matrix& Matrix::operator/=(double scalar) {
+    if (std::abs(scalar) < 1e-12) {
+        throw std::invalid_argument("Matrix Operator (/=): Divide by zero error");
     }
-    
-    for (size_t i = 0; i < rows; ++i) {
-        for (size_t j = 0; j < cols; ++j) {
-            if (data[i][j] != other(i, j)) {
-                return false;
-            }
-        }
+
+    const double inv = 1.0 / scalar;
+    for (double &v : data) v *= inv;
+    return *this;
+}
+
+
+// Boolean Operations
+bool Matrix::operator==(const Matrix& other) const {
+    if (!matchDim(*this, other)) return false;
+    const double* __restrict a = data.data();
+    const double* __restrict b = other.data.data();
+
+    for (size_t i = 0; i < data.size(); ++i) {
+        if (std::abs(a[i] - b[i]) > 1e-9) return false;
     }
 
     return true;
 }
 
-// Element-wise (Hadamard) product
+bool Matrix::operator!=(const Matrix& other) const {
+    return !(*this == other);
+}
+
+
+// Specialized Operations
 Matrix Matrix::hadamard(const Matrix& other) const {
-    if (rows != other.rows || cols != other.cols) {
-        throw std::invalid_argument("Matrix dimensions do not match");
+    if (!matchDim(*this, other)) {
+        throw std::invalid_argument("Matrix::hadamard(): Matrix dimensions must match");
     }
 
     Matrix result(rows, cols);
-    for (size_t i = 0; i < rows; ++i) {
-        for (size_t j = 0; j < cols; ++j) {
-            result(i, j) = data[i][j] * other(i, j);
-        }
-    }
+    const double* __restrict a = data.data();
+    const double* __restrict b = other.data.data();
+    double* __restrict r = result.data.data();
+    for (size_t i = 0; i < data.size(); ++i) r[i] = a[i] * b[i];
     return result;
 }
 
-// Transpose function
 Matrix Matrix::transpose() const {
     Matrix result(cols, rows);
-    for (size_t i = 0; i < rows; ++i) {
-        for (size_t j = 0; j < cols; ++j) {
-            result(j, i) = data[i][j];
+    const double* __restrict a = data.data();
+    double* __restrict r = result.data.data();
+
+    for (size_t row = 0; row < rows; ++row) {
+        for (size_t col = 0; col < cols; ++col) {
+            r[col * rows + row] = a[row * cols + col];
         }
     }
+
     return result;
 }
 
-// Apply function - input is a function R -> R and returns matrix with function applied to each element
 Matrix Matrix::apply(std::function<double(double)> func) const {
     Matrix result(rows, cols);
-    for (size_t i = 0; i < rows; ++i) {
-        for (size_t j = 0; j < cols; ++j) {
-            result(i, j) = func(data[i][j]);
-        }
-    }
+    const double* __restrict a = data.data();
+    double* __restrict r = result.data.data();
+    for (size_t i = 0; i < data.size(); ++i) r[i] = func(a[i]);
     return result;
 }
 
 Matrix Matrix::diag() const {
+    const double* __restrict a = data.data();
+
     if (cols == rows) {
         Matrix result(rows, 1);
-        for (size_t i = 0; i < rows; ++i) {
-            result(i, 0) = data[i][i];
-        }
-    } if (cols == 1) {
-        Matrix result(rows, rows); 
-        for (size_t i = 0; i < rows; ++i) {
-            result(i, i) = data[i][0];
-        }
-    } else {
-        throw std::runtime_error("Matrix must be of dimension (n x 1) or (n x n)");
+        double* __restrict r = result.data.data();
+        for (size_t row = 0; row < rows; ++row) r[row] = a[row * cols + row];
+        return result;
+    } else if (cols == 1) {
+        Matrix result(rows, rows);
+        double* __restrict r = result.data.data();
+        for (size_t row = 0; row < rows; ++row) r[row * rows + row] = a[row];
+        return result;
     }
+    
+    throw std::invalid_argument("Matrix::diag(): Matrix must be square or column vector");
 }
 
-// Initialize with random values
+
+// Initialization Methods
 void Matrix::randomize(double min, double max) {
     static std::random_device rd;
-    static std::mt19937 gen(rd());
+    static std::mt19937 g(rd());
     std::uniform_real_distribution<double> dis(min, max);
-
-    for (size_t i = 0; i < rows; ++i) {
-        for (size_t j = 0; j < rows; ++j) {
-            data[i][j] = dis(gen);
-        }
-    }
+    for (double &v : data) v = dis(g);
 }
 
 void Matrix::xavierInit() {
@@ -235,98 +262,76 @@ void Matrix::xavierInit() {
 
 void Matrix::heInit() {
     static std::random_device rd;
-    static std::mt19937 gen(rd());
-    double stddev = std::sqrt(2.0 / rows);
+    static std::mt19937 g(rd());
+    double stddev = std::sqrt(2.0 / cols);
     std::normal_distribution<double> dis(0.0, stddev);
-
-    for (size_t i = 0; i < rows; ++i) {
-        for (size_t j = 0; j < cols; ++j) {
-            data[i][j] = dis(gen);
-        }
-    }
+    for (double &v : data) v = dis(g);
 }
 
 void Matrix::fill(double value) {
-    for (size_t i = 0; i < rows; ++i) {
-        for (size_t j = 0; j < cols; ++j) {
-            data[i][j] = value;
-        }
-    }
+    std::fill(data.begin(), data.end(), value);
 }
 
-void Matrix::identity() {
-    if (rows != cols) {
-        throw std::invalid_argument("Indentity Matrix must be square");
-    }
-
-    fill(0.0);
-    for (size_t i = 0; i < rows; ++i) {
-        data[i][i] = 1.0;
-    }
+Matrix Matrix::identity(size_t dim) {
+    Matrix result(dim, dim);
+    for (size_t i = 0; i < dim; ++i) result.data[i * dim + i] = 1.0;
+    return result;
 }
+
 
 // Utility Methods
-bool Matrix::matchDim(const Matrix& dis, const Matrix& dat) {
-    return (dis.getRows() == dat.getRows() && dis.getCols() == dat.getCols());
+bool Matrix::matchDim(const Matrix& a, const Matrix& b) {
+    return (a.rows == b.rows && a.cols == b.cols);
 }
 
 double Matrix::sum() const {
-    double total = 0.0;
-    for (size_t i = 0; i < rows; ++i) {
-        for (size_t j = 0; j < cols; ++j) {
-            total += data[i][j];
-        }
-    }
-    return total;
+    return std::accumulate(data.begin(), data.end(), 0.0);
 }
 
-std::vector<double> Matrix::getRow(size_t row) const {
+Matrix Matrix::getRow(size_t row) const {
     if (row >= rows) {
-        throw std::out_of_range("Row index out of range");
+        throw std::out_of_range("Matrix::getRow(): Row index out of range");
     }
-    return data[row];
+
+    Matrix result(1, cols);
+    const double* src = data.data() + row * cols;
+    std::copy(src, src + cols, result.data.data());
+    return result;
 }
 
 Matrix Matrix::getCol(size_t col) const {
     if (col >= cols) {
-        throw std::out_of_range("Column index out of range");
+        throw std::out_of_range("Matrix::getCol(): Col index out of range");
     }
 
     Matrix result(rows, 1);
-    for (size_t i = 0; i < rows; ++i) {
-        result(i, 0) = data[i][col];
-    }
+    const double* __restrict a = data.data();
+    double* __restrict r = result.data.data();
+    for (size_t i = 0; i < rows; ++i) r[i] = a[i * cols + col];
     return result;
 }
 
-// Probably Needed Once we implement Mini-Batch Training
-Matrix Matrix::sliceCols(std::vector<size_t> indices, size_t begin, size_t end) const {
-    /**
-     * @param indices A vector of shuffled indices (for matrix with 6 cols: [2, 3, 6, 1, 5, 4] for example)
-     * @param begin starting index
-     * @param end ending index
-     * 
-     * The function should read [begin, end] and return the columns of the Matrix represented by the indices
-     * in the vector indices - from [begin to end]
-     * 
-     * For example: indices = [2, 3, 6, 1, 5, 4] - begin = 2, end = 4
-     * The function will return a Matrix of size (*this.rows)x(end - begin), where end - begin = 2, where the columns
-     * of the matrix are column 6 and column 1 of the Matrix object
-     * 
-     * Exceptions: end cannot be greater than Matrix.getCols()
-     */
-
-    if (begin >= end || end > indices.size()) {
-        throw std::out_of_range("Invalid slice range in sliceCols");
+Matrix Matrix::sumCols() const {
+    Matrix result(rows, 1);
+    const double* __restrict a = data.data();
+    double* __restrict r = result.data.data();
+    for (size_t row = 0; row < rows; ++row) {
+        const double* row_ptr = a + row * cols;
+        for (size_t col = 0; col < cols; ++col) r[row] += row_ptr[col];
     }
 
-    size_t newCols = end - begin;
-    Matrix result(rows, newCols);
+    return result;
+}
 
-    for (size_t r = 0; r < rows; ++r) {
-        for (size_t c = 0; c < newCols; ++c) {
-            size_t colIdx = indices[begin + c];
-            result(r, c) = data[r][colIdx];
+Matrix Matrix::sliceCols(const std::vector<size_t>& sliced_indices) const {
+    const size_t batch_size = sliced_indices.size();
+    Matrix result(rows, batch_size);
+    const double* __restrict a = data.data();
+    double* __restrict r = result.data.data();
+
+    for (size_t col = 0; col < batch_size; ++col) {
+        for (size_t row = 0; row < rows; ++row) {
+            r[row * batch_size + col] = a[row * cols + sliced_indices[col]];
         }
     }
 
@@ -335,33 +340,47 @@ Matrix Matrix::sliceCols(std::vector<size_t> indices, size_t begin, size_t end) 
 
 void Matrix::setCol(size_t col, const Matrix& colMatrix) {
     if (col >= cols) {
-        throw std::out_of_range("Column index out of range");
-    }
-    if (colMatrix.getCols() != 1 || colMatrix.getRows() != rows) {
-        throw std::invalid_argument("Matrix Dimnesions must match");
+        throw std::out_of_range("Matrix::setCol(): Col index out of range");
+    } else if (colMatrix.cols != 1 || colMatrix.rows != rows) {
+        throw std::invalid_argument("Matrix::setCol(): colMatrix has invalid matrix dimensions");
     }
 
-    for (size_t i = 0; i < rows; ++i) {
-        data[i][col] = colMatrix(i, 0);
+    const double* col_ptr = colMatrix.data.data();
+    for (size_t row = 0; row < rows; ++row) {
+        data[row * cols + col] = col_ptr[row];
     }
 }
 
 void Matrix::resize(size_t newRows, size_t newCols) {
     rows = newRows;
     cols = newCols;
-    data.clear();
-    data.resize(rows, std::vector<double>(cols, 0.0));
+    data.assign(rows * cols, 0.0);
 }
 
 void Matrix::print() const {
     std::cout << std::fixed << std::setprecision(6);
-    for (size_t i = 0; i < rows; ++i) {
+    for (size_t row = 0; row < rows; ++row) {
         std::cout << "[";
-        for (size_t j = 0; j < cols; ++j) {
-            std::cout << std::setw(10) << data[i][j];
-            if (j < cols - 1) std::cout << " ";
+        const double* row_ptr = data.data() + row * cols;
+        for (size_t col = 0; col < cols; ++col) {
+            std::cout << std::setw(10) << row_ptr[col];
+            if (col < cols - 1) std::cout << " ";
         }
         std::cout << "]" << std::endl;
     }
     std::cout << std::endl;
+}
+
+bool Matrix::hasNaNOrInf() const {
+    for (const double v : data) {
+        if (!std::isfinite(v)) return true;
+    }
+
+    return false;
+}
+
+void Matrix::assertFinite() const {
+    if (hasNaNOrInf()) {
+        throw std::runtime_error("NaN or Inf errors detected");
+    }
 }

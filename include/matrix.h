@@ -16,79 +16,89 @@
 
 class Matrix {
     private:
-        std::vector<std::vector<double>> data;
+        std::vector<double> data;
         size_t rows, cols;
     
     public:
-        // Constructors
         Matrix();
         Matrix(size_t rows, size_t cols);
         Matrix(size_t rows, size_t cols, double value);
-        Matrix(const Matrix& other);
-
-        // Assignment operator
-        Matrix& operator=(const Matrix& other);
+        Matrix(Matrix&& other) noexcept;
+        Matrix(const Matrix& other) = default;
 
         // Getters
         size_t getRows() const { return rows; }
         size_t getCols() const { return cols; }
 
-        // Element access
+        // Assignment Operators
+        Matrix& operator=(Matrix&& other) noexcept;
+        Matrix& operator=(const Matrix& other) = default;
+
+        // Element Access Operators
         double& operator()(size_t row, size_t col);
         const double& operator()(size_t row, size_t col) const;
+        double& at(size_t row, size_t col) { return data[row * cols + col]; }
+        const double& at(size_t row, size_t col) const { return data[row * cols + col]; }
 
-        // Matrix operations
+        // Matrix Operations
         Matrix operator+(const Matrix& other) const;
         Matrix operator-(const Matrix& other) const;
         Matrix operator*(const Matrix& other) const;
 
-        // Scalar operations
+        // Scalar Operations
         Matrix operator*(double scalar) const;
-        Matrix operator/(double scaler) const;
+        Matrix operator/(double scalar) const;
 
-        // In-place operations
+        // In-place Matrix Operations
         Matrix& operator+=(const Matrix& other);
         Matrix& operator-=(const Matrix& other);
+
+        // In-place Scalar Operations
         Matrix& operator*=(double scalar);
+        Matrix& operator/=(double scalar);
 
-        // Boolean operation
+        // Boolean Operations
         bool operator==(const Matrix& other) const;
+        bool operator!=(const Matrix& other) const;
 
-        // Specialized operations
+        // Specialized Operations
         Matrix hadamard(const Matrix& other) const;
         Matrix transpose() const;
         Matrix apply(std::function<double(double)> func) const;
         Matrix diag() const;
 
-        // Initializations methods
-        void randomize(double min=-1.0, double max=1.0);
+        // Initialization Methods
+        void randomize(double min=0.0, double max=1.0);
         void xavierInit();
         void heInit();
         void fill(double value);
-        void identity();
+        static Matrix identity(size_t dim);
 
-        // Utility methods
-        static bool matchDim(const Matrix& dis, const Matrix& dat);
+        // Utility Methods
+        static bool matchDim(const Matrix& a, const Matrix& b);
         double sum() const;
-        std::vector<double> getRow(size_t row) const;
+        Matrix getRow(size_t row) const;
         Matrix getCol(size_t col) const;
         Matrix sumCols() const;
-        Matrix sliceCols(std::vector<size_t> indices, size_t begin, size_t end) const;
+        Matrix sliceCols(const std::vector<size_t>& sliced_indices) const;
         void setCol(size_t col, const Matrix& colMatrix);
         void resize(size_t newRows, size_t newCols);
         void print() const;
         bool empty() const { return rows == 0 || cols == 0; }
+        bool hasNaNOrInf() const;
+        void assertFinite() const;
 };
 
 // External scalar multiplication (scalar * matrix)
-inline Matrix operator*(double scalar, const Matrix& matrix) {
+inline Matrix operator*(const double scalar, const Matrix& matrix) {
     return matrix * scalar;
 }
 
 // Stream output operator
 inline std::ostream& operator<<(std::ostream& os, const Matrix& matrix) {
-    os << "Matrix(" << matrix.getRows() << "x" << matrix.getCols() << ")";
+    os << "Matrix(" << matrix.getRows() << ", " << matrix.getCols() << ")";
     return os;
 }
+
 
 #endif // MATRIX_H
