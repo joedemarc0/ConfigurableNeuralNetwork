@@ -1,6 +1,7 @@
 #include "matrix.h"
 #include "utils.h"
 #include <stdexcept>
+#include <random>
 
 
 // Matrix Class Constructors
@@ -168,6 +169,74 @@ bool Matrix::operator==(const Matrix& other) const {
 
 bool Matrix::operator!=(const Matrix& other) const {
     return !(*this == other);
+}
+
+
+// Specialized Operations
+Matrix Matrix::hadamard(const Matrix& other) const {
+    ASSERT(matchDim(*this, other), "Matrix dimensions must match");
+    Matrix result(rows_, cols_);
+    const size_t n = data_.size();
+    const double* __restrict a = data_.data();
+    const double* __restrict b = other.data_.data();
+    double* __restrict r = result.data_.data();
+    for (size_t i = 0; i < n; ++i) r[i] = a[i] * b[i];
+    return result;
+}
+
+Matrix Matrix::transpose() const {
+    Matrix result(rows_, cols_);
+    const double* __restrict a = data_.data();
+    double* __restrict r = result.data_.data();
+
+    constexpr size_t BLOCK = 32;
+    for (size_t i = 0; i < rows_; i += BLOCK) {
+        for (size_t j = 0; j < cols_; j += BLOCK) {
+            for (size_t ii = i; ii < std::min(i + BLOCK, rows_); ++ii) {
+                for (size_t jj = j; j < std::min(j + BLOCK, cols_); ++jj) {
+                    r[jj * rows_ + ii] = a[ii * cols_ + jj];
+                }
+            }
+        }
+    }
+
+    return result;
+}
+
+Matrix Matrix::sumCols() const {
+    Matrix result(rows_, 1);
+    const double* __restrict a = data_.data();
+    double* __restrict r = result.data_.data();
+    for (size_t row = 0; row < rows_; ++row) {
+        const double* row_ptr = a + row * cols_;
+        for (size_t col = 0; col < cols_; ++col) r[row] += row_ptr[col];
+    }
+
+    return result;
+}
+
+
+// Initialization Methods
+void Matrix::randomize(double min, double max) {
+    static std::mt19937 rng(std::random_device{}());
+    std::uniform_real_distribution<double> dis(min, max);
+    for (double& v : data_) v = dis(rng);
+}
+
+void Matrix::xavierInit() {
+    double limit = std::sqrt(6.0 / (rows_ + cols_));
+    randomize(-limit, limit);
+}
+
+void Matrix::heInit() {
+    static std::mt19937 rng(std::random_device{}());
+    double stddev = std::sqrt(2.0 / cols_);
+    std::normal_distribution<double> dis(0.0, stddev);
+    for (double& v : data_) v = dis(rng);
+}
+
+void Matrix::fill(double value) {
+    std::fill(data_.begin(), data_.end(), value);
 }
 
 

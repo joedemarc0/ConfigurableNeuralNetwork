@@ -2,6 +2,8 @@
 #define MATRIX_H
 
 #include <vector>
+#include <iostream>
+#include <functional>
 
 
 class Matrix {
@@ -66,6 +68,16 @@ class Matrix {
         bool operator==(const Matrix& other) const;
         bool operator!=(const Matrix& other) const;
 
+        // Specialized Operations
+        Matrix hadamard(const Matrix& other) const;
+        Matrix transpose() const;
+        Matrix sumCols() const;
+
+        // Initialization methods
+        void randomize(double min=0.0, double max=1.0);
+        void xavierInit();
+        void heInit();
+        void fill(double value);
 
         // Utility Functions
         static bool matchDim(const Matrix& a, const Matrix& b);
