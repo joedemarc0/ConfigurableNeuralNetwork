@@ -84,6 +84,13 @@ Matrix Network::Layer::backward(const Matrix& dA, size_t batch_size, double lear
 // ===============================
 // Network Class Private Functions
 // ===============================
+void Network::addOutputLayer() {
+    ASSERT(!layers.empty(), "Network must have at least one hidden layer");
+    size_t input_dim = layers.back().getOutputSize();
+    size_t output_dim = numClasses;
+    layers.emplace_back(input_dim, output_dim, Activations::ActivationType::SOFTMAX, InitType::XAVIER);
+}
+
 Matrix Network::forward(const Matrix& X) {
     ASSERT(isCompiled, "Network is not compiled");
     ASSERT(X.rows() == networkInputSize, "Forwarding matrix has invalid dimensions");
@@ -106,10 +113,43 @@ void Network::backward(const Matrix& y_true, double learning_rate) {
 // ==============================
 // Network Class Public Functions
 // ==============================
-void Network::addLayer(size_t neurons) {
+void Network::addLayer(size_t neurons, Activations::ActivationType act_type, InitType init_type) {
     ASSERT(neurons != 0, "Cannot add layer with 0 neurons");
     ASSERT(!isCompiled, "Network is already compiled");
 
     size_t input_dim = layers.empty() ? networkInputSize : layers.back().getOutputSize();
-    layers.emplace_back();
+    layers.emplace_back(input_dim, neurons, act_type, init_type);
+}
+
+void Network::compile() {
+    ASSERT(!isCompiled, "Network is already compiled");
+    ASSERT(!layers.empty(), "Network cannot be compiled with zero hidden layers");
+
+    size_t layer_idx = 0;
+    size_t expected_input_size = networkInputSize;
+    for (auto& layer : layers) {
+        size_t input_size = layer.getInputSize();
+        auto act = layer.getActivationType();
+
+        if (act == Activations::ActivationType::SOFTMAX) {
+            throw std::runtime_error(
+                "Invalid activation function type at layer " + std::to_string(layer_idx) +
+                ", activation function: " + Activations::to_string(act)
+            );
+        }
+
+        if (input_size != expected_input_size) {
+            throw std::runtime_error(
+                "Dimension mismatch at layer " + std::to_string(layer_idx) +
+                ", expected: " + std::to_string(expected_input_size) + 
+                ", got: " + std::to_string(input_size)
+            );
+        }
+
+        expected_input_size = layer.getOutputSize();
+        layer_idx++;
+    }
+
+    addOutputLayer();
+    isCompiled = true;
 }

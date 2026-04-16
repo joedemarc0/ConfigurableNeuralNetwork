@@ -55,6 +55,7 @@ class Network {
         const size_t numClasses;
         Matrix lastOutput;
 
+        void addOutputLayer();
         Matrix forward(const Matrix& X);
         void backward(const Matrix& y_true, double learning_rate);
     
@@ -64,8 +65,8 @@ class Network {
             size_t num_classes
         );
 
-        void addLayer(size_t neurons);
         void addLayer(size_t neurons, Activations::ActivationType act_type, InitType init_type);
+        void compile();
 };
 
 
