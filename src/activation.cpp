@@ -2,106 +2,62 @@
 #include <cmath>
 #include <algorithm>
 
+using namespace Activations;
 
-namespace Activations {
-    Matrix activate(const Matrix& x, ActivationType type) {
-        Matrix result(x.getRows(), x.getCols());
 
-        switch (type) {
-            case ActivationType::SIGMOID: {
-                for (size_t i = 0; i < x.getRows(); ++i) {
-                    for (size_t j = 0; j < x.getCols(); ++j) {
-                        result(i, j) = 1.0 / (1.0 + std::exp(-x(i, j)));
-                    }
-                }
-                break;
-            }
-
-            case ActivationType::RELU: {
-                for (size_t i = 0; i < x.getRows(); ++i) {
-                    for (size_t j = 0; j < x.getCols(); ++j) {
-                        result(i, j) = std::max(0.0, x(i, j));
-                    }
-                }
-                break;
-            }
-
-            case ActivationType::LEAKY_RELU: {
-                double alpha = 0.01;
-                for (size_t i = 0; i < x.getRows(); ++i) {
-                    for (size_t j = 0; j < x.getCols(); ++j) {
-                        result(i, j) = x(i, j) > 0 ? x(i, j) : alpha * x(i, j);
-                    }
-                }
-                break;
-            }
-
-            case ActivationType::SOFTMAX: {
-                for (size_t i = 0; i < x.getRows(); ++i) {
-                    double rowMax = x.getRow(i)[0];
-                    for (size_t j = 1; j < x.getCols(); ++j) {
-                        if (x(i, j) > rowMax) rowMax = x(i, j);
-                    }
-
-                    double sumExp = 0.0;
-                    for (size_t j = 0; j < x.getCols(); ++j) {
-                        result(i, j) = std::exp(x(i, j) - rowMax);
-                        sumExp += result(i, j);
-                    }
-
-                    for (size_t j = 0; j < x.getCols(); ++j) {
-                        result(i, j) /= sumExp;
-                    }
-                }
-                break;
-            }
-
-            default: result = x;
+Matrix Activations::activate(const Matrix& x, ActivationType type) {
+    switch(type) {
+        case ActivationType::RELU: return x.apply([](double v) { return std::max(0.0, v); });
+        case ActivationType::LEAKY_RELU: {
+            constexpr double alpha = 0.01;
+            return x.apply([](double v) { return v > 0.0 ? v : alpha * v; });
         }
 
-        return result;
+        case ActivationType::SOFTMAX: {
+            size_t rows = x.rows();
+            size_t cols = x.cols();
+            Matrix result(rows, cols);
+            const double* __restrict src = x.data();
+            double* __restrict dst = result.data();
+
+            for (size_t j = 0; j < cols; ++j) {
+                double max_val = src[j];
+                for (size_t i = 1; i < rows; ++i) if (src[i * cols + j] > max_val) max_val = src[i * cols + j];
+
+                double exp_sum = 0.0;
+                for (size_t i = 0; i < rows; ++i) {
+                    dst[i * cols + j] = std::exp(src[i * cols + j] - max_val);
+                    exp_sum += dst[i * cols + j];
+                }
+
+                const double inv_sum = 1.0 / exp_sum;
+                for (size_t i = 0; i < rows; ++i) dst[i * cols + j] = std::max(dst[i * cols + j] * inv_sum, 1e-12);
+            }
+
+            return result;
+        }
+
+        default: throw std::runtime_error("Activation type unspecified");
     }
+}
 
-    Matrix deriv_activate(const Matrix& x, ActivationType type) {
-        Matrix result(x.getRows(), x.getCols());
-        switch (type) {
-            case ActivationType::SIGMOID: {
-                Matrix s(x.getRows(), x.getCols());
-                for (size_t i = 0; i < x.getRows(); ++i) {
-                    for (size_t j = 0; j < x.getCols(); ++j) {
-                        s(i, j) = 1.0 / (1.0 + std::exp(-x(i, j)));
-                        result(i, j) = s(i, j) * (1.0 - s(i, j));
-                    }
-                }
-                break;
-            }
-
-            case ActivationType::RELU: {
-                for (size_t i = 0; i < x.getRows(); ++i) {
-                    for (size_t j = 0; j < x.getCols(); ++j) {
-                        result(i, j) = x(i, j) > 0 ? 1.0 : 0.0;
-                    }
-                }
-                break;
-            }
-
-            case ActivationType::LEAKY_RELU: {
-                double alpha = 0.01;
-                for (size_t i = 0; i < x.getRows(); ++i) {
-                    for (size_t j = 0; j < x.getCols(); ++j) {
-                        result(i, j) = x(i, j) > 0 ? 1.0 : alpha;
-                    }
-                }
-                break;
-            }
-
-            case ActivationType::SOFTMAX: {
-                throw std::invalid_argument("This should theoretically not be called");
-            }
-
-            default: result = x;
+Matrix Activations::deriv_activate(const Matrix& x, ActivationType type) {
+    switch(type) {
+        case ActivationType::RELU: return x.apply([](double v) { return v > 0.0 ? 1.0 : 0.0; });
+        case ActivationType::LEAKY_RELU: {
+            constexpr double alpha = 0.01;
+            return x.apply([](double v) { return v > 0.0 ? 1.0 : alpha; });
         }
 
-        return result;
+        default: throw std::runtime_error("Activation type unspecified");
+    }
+}
+
+std::string Activations::to_string(ActivationType type) {
+    switch(type) {
+        case ActivationType::RELU: return "RELU";
+        case ActivationType::LEAKY_RELU: return "LEAKY_RELU";
+        case ActivationType::SOFTMAX: return "SOFTMAX";
+        default: throw std::runtime_error("Activation type unspecified");
     }
 }
