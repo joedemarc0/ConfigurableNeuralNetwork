@@ -1,25 +1,16 @@
-/**
- * A minimal "matrix" or "tensor" implementation - don't have to rely on std::vector<float> or whatever everywhere
- * 
- * Store 2D arrays (weights, biases, activations)
- * Basic ops: dot product, elementwise add/multiply, transpose, random init
- * Numpy-lite
- */
-
 #ifndef MATRIX_H
 #define MATRIX_H
 
 #include <vector>
-#include <iostream>
-#include <functional>
 
 
 class Matrix {
     private:
-        std::vector<double> data;
-        size_t rows, cols;
+        size_t rows_, cols_;
+        std::vector<double> data_;
     
     public:
+        // Constructors
         Matrix();
         Matrix(size_t rows, size_t cols);
         Matrix(size_t rows, size_t cols, double value);
@@ -27,18 +18,32 @@ class Matrix {
         Matrix(const Matrix& other) = default;
 
         // Getters
-        size_t getRows() const { return rows; }
-        size_t getCols() const { return cols; }
+        size_t rows() const { return rows_; }
+        size_t cols() const { return cols_; }
+        double* data() { return data_.data(); }
+        const double* data() const { return data_.data(); }
 
         // Assignment Operators
         Matrix& operator=(Matrix&& other) noexcept;
         Matrix& operator=(const Matrix& other) = default;
 
-        // Element Access Operators
+        // Element Access
         double& operator()(size_t row, size_t col);
         const double& operator()(size_t row, size_t col) const;
-        double& at(size_t row, size_t col) { return data[row * cols + col]; }
-        const double& at(size_t row, size_t col) const { return data[row * cols + col]; }
+        double& at(size_t row, size_t col) { return data_[row * cols_ + col]; }
+        const double& at(size_t row, size_t col) const { return data_[row * cols_ + col]; }
+
+        // Function applying
+        template <typename Fn>
+        Matrix apply(Fn&& func) const {
+            Matrix result(rows_, cols_);
+            const double* __restrict a = data_.data();
+            double* __restrict r = result.data_.data();
+
+            const size_t n = data_.size();
+            for (size_t i = 0; i < n; ++i) r[i] = func(a[i]);
+            return result;
+        }
 
         // Matrix Operations
         Matrix operator+(const Matrix& other) const;
@@ -61,42 +66,19 @@ class Matrix {
         bool operator==(const Matrix& other) const;
         bool operator!=(const Matrix& other) const;
 
-        // Specialized Operations
-        Matrix hadamard(const Matrix& other) const;
-        Matrix transpose() const;
-        Matrix apply(std::function<double(double)> func) const;
-        Matrix diag() const;
 
-        // Initialization Methods
-        void randomize(double min=0.0, double max=1.0);
-        void xavierInit();
-        void heInit();
-        void fill(double value);
-        static Matrix identity(size_t dim);
-
-        // Utility Methods
+        // Utility Functions
         static bool matchDim(const Matrix& a, const Matrix& b);
-        double sum() const;
-        Matrix getRow(size_t row) const;
-        Matrix getCol(size_t col) const;
-        Matrix sumCols() const;
-        Matrix sliceCols(const std::vector<size_t>& sliced_indices) const;
-        void setCol(size_t col, const Matrix& colMatrix);
-        void resize(size_t newRows, size_t newCols);
-        void print() const;
-        bool empty() const { return rows == 0 || cols == 0; }
-        bool hasNaNOrInf() const;
-        void assertFinite() const;
 };
 
-// External scalar multiplication (scalar * matrix)
-inline Matrix operator*(const double scalar, const Matrix& matrix) {
+// Scalar multiplication is commutative
+inline Matrix operator*(double scalar, const Matrix& matrix) {
     return matrix * scalar;
 }
 
 // Stream output operator
 inline std::ostream& operator<<(std::ostream& os, const Matrix& matrix) {
-    os << "Matrix(" << matrix.getRows() << ", " << matrix.getCols() << ")";
+    os << "Matrix(" << matrix.rows() << ", " << matrix.cols() << ")";
     return os;
 }
 
