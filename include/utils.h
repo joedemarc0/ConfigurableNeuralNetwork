@@ -1,9 +1,9 @@
 #ifndef UTILS_H
 #define UTILS_H
 
-
 #include <stdexcept>
 #include <iostream>
+
 
 #define ASSERT(condition, msg) \
     if (!(condition)) { throw DetailedException(msg, __PRETTY_FUNCTION__); }
