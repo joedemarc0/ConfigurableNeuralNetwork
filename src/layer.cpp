@@ -8,6 +8,7 @@
 Input::Input(size_t input_size) : inputSize(input_size) {}
 Matrix Input::forward(const Matrix& X) { return X; }
 Matrix Input::backward(const Matrix& dA) { return dA; }
+void Input::build(size_t input_size) { inputSize = outputSize = input_size; }
 
 
 // ========================
@@ -28,23 +29,47 @@ Dense::Dense(
     size_t output_size,
     Activations::ActivationType act_type,
     InitType init_type
-) : inputSize(input_size),
-    outputSize(output_size),
+) : outputSize(output_size),
     actType(act_type),
     initType(init_type)
 {
     ASSERT(input_size != 0, "Input size cannot be 0");
+    build(input_size);
 }
 
 // =============================
 // Dense Layer Private Functions
 // =============================
-void Dense::build(size_t input_size) {}
+void Dense::initialize() {
+    switch(initType) {
+        case InitType::RANDOM: { weights.randomize(); break; }
+        case InitType::XAVIER: { weights.xavierInit(); break; }
+        case InitType::HE: { weights.heInit(); break; }
+        case InitType::NONE: { break; }
+        default: throw std::runtime_error("Layer init type unspecified");
+    }
+}
+
+void Dense::updateParams(double learning_rate) {
+    weights -= dWeights * learning_rate;
+    biases -= dbiases * learning_rate;
+}
 
 
 // ============================
 // Dense Layer Public Functions
 // ============================
+void Dense::build(size_t input_size) {
+    if (built) return;
+
+    inputSize = input_size;
+    weights = Matrix(outputSize, inputSize);
+    biases = Matrix(outputSize, 1);
+
+    initialize();
+    built = true;
+}
+
 Matrix Dense::forward(const Matrix& X) {
     ASSERT(X.rows() == inputSize, "Forwarding matrix of incorrect size");
 
@@ -55,8 +80,10 @@ Matrix Dense::forward(const Matrix& X) {
     return A;
 }
 
-Matrix Dense::backward(const Matrix& dA, size_t batch_size, double learning_rate) {
+Matrix Dense::backward(const Matrix& dA) {
+    size_t batch_size = dA.cols();
     Matrix dZ;
+
     if (actType == Activations::ActivationType::SOFTMAX) {
         dZ = dA;
     } else {
@@ -64,13 +91,11 @@ Matrix Dense::backward(const Matrix& dA, size_t batch_size, double learning_rate
         dZ = dA.hadamard(sigma_prime);
     }
 
-    Matrix dWeights = dZ * input.transpose();
-    Matrix dbiases = dZ.sumCols();
+    dWeights = dZ * input.transpose();
     dWeights /= batch_size;
+
+    dbiases = dZ.sumCols();
     dbiases /= batch_size;
 
-    Matrix dA_out = weights.transpose() * dZ;
-    updateParams(dWeights, dbiases, learning_rate);
-
-    return dA_out;
+    return weights.transpose() * dZ;
 }

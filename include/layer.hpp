@@ -9,16 +9,19 @@ enum class LayerType { Dense, Input };
 
 class Layer {
     private:
-        virtual void build() = 0;
-        virtual void build(size_t input_size) = 0;
-        virtual bool isBuilt() const = 0;
-        virtual void updateParams(const Matrix& dWeights, const Matrix& dbiases, double learning_rate) = 0;
+        size_t inputSize;
+        size_t outputSize;
 
     public:
         virtual Matrix forward(const Matrix& X) = 0;
         virtual Matrix backward(const Matrix& dA) = 0;
-        virtual Matrix backward(const Matrix& dA, size_t batch_size, double learning_rate) = 0;
+        virtual void build(size_t input_size) = 0;
+
         virtual LayerType type() const = 0;
+        virtual bool isBuilt() const = 0;
+        virtual size_t getInputSize() const = 0;
+        virtual size_t getOutputSize() const = 0;
+
         virtual ~Layer() = default;
 };
 
@@ -26,13 +29,19 @@ class Layer {
 class Input : public Layer {
     private:
         size_t inputSize;
+        size_t outputSize = inputSize;
     
     public:
         Input(size_t input_size);
 
         Matrix forward(const Matrix& X) override;
         Matrix backward(const Matrix& dA) override;
+        void build(size_t input_size) override;
+
         LayerType type() const override { return LayerType::Input; }
+        bool isBuilt() const override { return true; }
+        size_t getInputSize() const override { return inputSize; }
+        size_t getOutputSize() const override { return outputSize; }
 };
 
 
@@ -46,15 +55,15 @@ class Dense : public Layer {
         Matrix input;
         Matrix preActivation;
 
+        Matrix dWeights;
+        Matrix dbiases;
+
         bool built = false;
         Activations::ActivationType actType;
         InitType initType;
 
         void initialize();
-        void updateParams(const Matrix& dWeights, const Matrix& dbiases, double learning_rate) override;
-
-        void build(size_t input_size) override;
-        bool isBuilt() const override { return built; }
+        void updateParams(double learning_rate);
     
     public:
         Dense(
@@ -71,18 +80,34 @@ class Dense : public Layer {
         );
 
         Matrix forward(const Matrix& X) override;
-        Matrix backward(const Matrix& dA, size_t batch_size, double learning_rate) override;
+        Matrix backward(const Matrix& dA) override;
+        void build(size_t input_size) override;
+
         LayerType type() const override { return LayerType::Dense; }
+        bool isBuilt() const override { return built; }
+        size_t getInputSize() const override { return inputSize; }
+        size_t getOutputSize() const override { return outputSize; }
 
         // Getters
-        size_t getInputSize() const { return inputSize; }
-        size_t getOutputSize() const { return outputSize; }
         const Matrix& getWeights() const { return weights; }
         const Matrix& getBiases() const { return biases; }
         const Matrix& getZ() const { return preActivation; }
         Activations::ActivationType getActivationType() const { return actType; }
         InitType getInitType() const { return initType; }
 };
+
+
+inline std::string to_string(LayerType type) {
+    switch(type) {
+        case LayerType::Input: { return "Input"; }
+        case LayerType::Dense: { return "Dense"; }
+    }
+}
+
+
+inline std::ostream& operator<<(std::ostream& os, const Layer& layer) {
+    os << to_string(layer.type()) << "(" << layer.getInputSize() << ", " << layer.getOutputSize() << ")";
+}
 
 
 #endif // LAYER_H
