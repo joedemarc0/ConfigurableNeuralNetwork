@@ -10,7 +10,7 @@ class Sequential {
 
         template <
             typename... Args,
-            typename = std::enable_if_t<(std::is_base_of_v<Dense, Args>&& ...)>
+            typename = std::enable_if_t<(std::is_base_of_v<Layer, Args>&& ...)>
         >
         Sequential(Args... args);
     
@@ -19,7 +19,11 @@ class Sequential {
         std::vector<std::unique_ptr<Layer>> layers;
     
     public:
+        void addLayer(std::unique_ptr<Layer> layer);
         void compile();
+
+        bool checkCompiled() const { return isCompiled; }
+        const std::vector<std::unique_ptr<Layer>>& getLayers() const { return layers; }
 };
 
 template <
@@ -35,13 +39,19 @@ Sequential::Sequential(Args... args)
         if (layer_num > 0) ASSERT(layer.type() != LayerType::Input, "Only the first layer can be an input layer");
         layers.push_back(std::make_unique<T>(std::forward<decltype(layer)>(layer)));
         ++layer_num;
-    }
+    };
 
     (add_one(std::forward<Args>(args)), ...);
 }
 
 
-inline std::ostream& operator<<(std::ostream& os, const Sequential& model) {}
+inline std::ostream& operator<<(std::ostream& os, const Sequential& model) {
+    os << "Sequential(" << "compiled: " << model.checkCompiled() << ", ";
+    for (auto& layer : model.getLayers()) os << layer << ", ";
+    os << ")";
+    
+    return os; 
+}
 
 
 #endif // SEQUENTIAL_H
