@@ -30,16 +30,16 @@ void Sequential::compile() {
 
     size_t layer_num = 0;
     for (auto& layer : layers) {
-        if (layer_num == 0 && layer->type() != LayerType::Input) {
-            throw std::runtime_error("Error: network cannot be compiled before forward passing if there is no Input Layer");
+        if (layer_num == 0) {
+            ASSERT(layer->type() != LayerType::Input, "Cannot compile network through compile() with no Input layer");
+            layer_num++;
+            continue;
         }
 
         size_t input_size = layer->getInputSize();
         size_t expected_input_size = layers[layer_num - 1]->getOutputSize();
-        if (layer->isBuilt()) { ASSERT(input_size == expected_input_size, "Dimension mismatch between layers"); }
+        if (layer->isBuilt()) { ASSERT(input_size == expected_input_size, "Dimensions mismatch between layers"); }
         else { layer->build(expected_input_size); }
-
-        layer_num++;
     }
 
     isCompiled = true;
