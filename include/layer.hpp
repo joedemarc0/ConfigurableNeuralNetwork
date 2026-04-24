@@ -29,7 +29,8 @@ class Layer {
 class Input : public Layer {
     private:
         size_t inputSize;
-        size_t outputSize = inputSize;
+        size_t outputSize;
+        bool built = false;
     
     public:
         Input(size_t input_size);
@@ -39,7 +40,7 @@ class Input : public Layer {
         void build(size_t input_size) override;
 
         LayerType type() const override { return LayerType::Input; }
-        bool isBuilt() const override { return true; }
+        bool isBuilt() const override { return built; }
         size_t getInputSize() const override { return inputSize; }
         size_t getOutputSize() const override { return outputSize; }
 };
@@ -64,6 +65,7 @@ class Dense : public Layer {
 
         void initialize();
         void updateParams(double learning_rate);
+        void build();
     
     public:
         Dense(
@@ -103,7 +105,6 @@ inline std::string to_string(LayerType type) {
         case LayerType::Dense: { return "Dense"; }
     }
 }
-
 
 inline std::ostream& operator<<(std::ostream& os, const Layer& layer) {
     os << to_string(layer.type()) << "(" << layer.getInputSize() << ", " << layer.getOutputSize() << ")";

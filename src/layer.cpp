@@ -8,7 +8,10 @@
 Input::Input(size_t input_size) : inputSize(input_size) {}
 Matrix Input::forward(const Matrix& X) { return X; }
 Matrix Input::backward(const Matrix& dA) { return dA; }
-void Input::build(size_t input_size) { inputSize = outputSize = input_size; }
+void Input::build(size_t input_size) { 
+    inputSize = outputSize = input_size;
+    built = true;
+}
 
 
 // ========================
@@ -29,12 +32,13 @@ Dense::Dense(
     size_t output_size,
     Activations::ActivationType act_type,
     InitType init_type
-) : outputSize(output_size),
+) : inputSize(input_size),
+    outputSize(output_size),
     actType(act_type),
     initType(init_type)
 {
     ASSERT(input_size != 0, "Input size cannot be 0");
-    build(input_size);
+    build();
 }
 
 // =============================
@@ -53,6 +57,14 @@ void Dense::initialize() {
 void Dense::updateParams(double learning_rate) {
     weights -= dWeights * learning_rate;
     biases -= dbiases * learning_rate;
+}
+
+void Dense::build() {
+    weights = Matrix(outputSize, inputSize);
+    biases = Matrix(outputSize, 1);
+
+    initialize();
+    built = true;
 }
 
 
