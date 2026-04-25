@@ -7,8 +7,8 @@
 class LayerConfig {
     public:
         LayerConfig();
-        LayerConfig(const LayerConfig& other);
-        LayerConfig& operator=(const LayerConfig& other);
+        LayerConfig(const LayerConfig& other) = delete;
+        LayerConfig& operator=(const LayerConfig& other) = delete;
         ~LayerConfig();
 
         bool empty() const { return head == nullptr; }
@@ -20,10 +20,10 @@ class LayerConfig {
         void clear();
 
         template <typename T>
-        void push_front(const T& layer);
+        void push_front(T&& layer);
 
         template <typename T>
-        void push_back(const T& layer);
+        void push_back(T&& layer);
     
     private:
         struct Node {
@@ -37,11 +37,45 @@ class LayerConfig {
         Node* head;
         Node* tail;
         size_t size_;
+    
+    public:
+        class Iterator {
+            public:
+                Iterator();
+                Iterator(const Iterator& i);
+                Iterator& operator=(const Iterator& i);
+                ~Iterator();
+
+                // Increment/Decrement
+                Iterator& operator--();
+                Iterator& operator++();
+
+                // Dereference
+                std::unique_ptr<Layer>& operator*() const;
+                Layer* operator->() const;
+
+                // Comparison
+                bool operator==(const Iterator& other) const;
+                bool operator!=(const Iterator& other) const;
+            
+            private:
+                friend class LayerConfig;
+
+                Node* node_ptr;
+                Iterator(Node* p) { node_ptr = p; }
+        };
+
+        Iterator begin() const { return Iterator(head); }
+        Iterator end() const { return Iterator(); }
+        void erase(Iterator i);
+
+        template <typename T>
+        void insert(Iterator i, T&& layer);
 };
 
 
 template <typename T>
-void LayerConfig::push_front(const T& layer) {
+void LayerConfig::push_front(T&& layer) {
     static_assert(std::is_base_of_v<Layer, T>, "Must be Layer class derivative");
     Node* target = new Node(std::make_unique<T>(std::move(layer)));
     target->next = head;
@@ -58,7 +92,7 @@ void LayerConfig::push_front(const T& layer) {
 }
 
 template <typename T>
-void LayerConfig::push_back(const T& layer) {
+void LayerConfig::push_back(T&& layer) {
     static_assert(std::is_base_of_v<Layer, T>, "Must be Layer class derivative");
     Node* target = new Node(std::make_unique<T>(std::move(layer)));
     target->next = nullptr;
@@ -74,9 +108,25 @@ void LayerConfig::push_back(const T& layer) {
     ++size_;
 }
 
+template <typename T>
+void LayerConfig::insert(Iterator i, T&& layer) {
+    static_assert(std::is_base_of_v<Layer, T>, "Must be Layer class derivative");
+    if (i == end()) {
+        push_back(std::move(layer));
+        return;
+    } else if (i.node_ptr == head) {
+        push_front(std::move(layer));
+        return;
+    }
 
+    Node* node = new Node(std::move(layer));
+    node->next = i.node_ptr;
+    node->prev = i.node_ptr->prev;
+    i.node_ptr->prev->next = node;
+    i.node_ptr->prev = node;
 
-
+    ++size_;
+}
 
 
 #endif // LAYER_CONFIG_H
