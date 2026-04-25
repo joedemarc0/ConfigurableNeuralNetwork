@@ -4,6 +4,7 @@
 #include "layer.hpp"
 #include <cassert>
 
+
 class LayerConfig {
     public:
         LayerConfig();
@@ -11,13 +12,15 @@ class LayerConfig {
         LayerConfig& operator=(const LayerConfig& other) = delete;
         ~LayerConfig();
 
-        bool empty() const { return head == nullptr; }
-        size_t size() const { return size_;}
-        std::unique_ptr<Layer>& front();
-        std::unique_ptr<Layer>& back();
+        bool empty() const { return sHead.next == &sTail; }
+        size_t size() const { return size_; }
+        std::unique_ptr<Layer>& front() const;
+        std::unique_ptr<Layer>& back() const;
         void pop_front();
         void pop_back();
         void clear();
+        void push_front(std::unique_ptr<Layer> layer);
+        void push_back(std::unique_ptr<Layer> layer);
 
         template <typename T>
         void push_front(T&& layer);
@@ -27,21 +30,21 @@ class LayerConfig {
     
     private:
         struct Node {
-            Node* next;
-            Node* prev;
+            Node* next = nullptr;
+            Node* prev = nullptr;
             std::unique_ptr<Layer> layer;
 
-            Node(std::unique_ptr<Layer> l) : next(nullptr), prev(nullptr), layer(std::move(l)) {}
+            Node() = default;   // for sentinels
+            Node(std::unique_ptr<Layer> l) : layer(std::move(l)) {}
         };
 
-        Node* head;
-        Node* tail;
+        mutable Node sHead;
+        mutable Node sTail;
         size_t size_;
     
     public:
         class Iterator {
             public:
-                Iterator();
                 Iterator(const Iterator& i);
                 Iterator& operator=(const Iterator& i);
                 ~Iterator();
@@ -62,31 +65,30 @@ class LayerConfig {
                 friend class LayerConfig;
 
                 Node* node_ptr;
+                Iterator() { node_ptr = nullptr; }
                 Iterator(Node* p) { node_ptr = p; }
-        };
+        }; // Iterator Class
 
-        Iterator begin() const { return Iterator(head); }
-        Iterator end() const { return Iterator(); }
+        Iterator begin() const { return Iterator(sHead.next); }
+        Iterator end() const { return Iterator(&sTail); }
         void erase(Iterator i);
+        void insert(Iterator i, std::unique_ptr<Layer> layer);
 
         template <typename T>
         void insert(Iterator i, T&& layer);
-};
+}; // Class LayerConfig
 
 
 template <typename T>
 void LayerConfig::push_front(T&& layer) {
     static_assert(std::is_base_of_v<Layer, T>, "Must be Layer class derivative");
-    Node* target = new Node(std::make_unique<T>(std::move(layer)));
-    target->next = head;
-    target->prev = nullptr;
+    Node* node = new Node(std::make_unique<T>(std::forward<T>(layer)));
 
-    if (!empty()) {
-        head->prev = target;
-        head = target;
-    } else {
-        head = tail = target;
-    }
+    node->next = sHead.next;
+    node->prev = &sHead;
+
+    sHead.next->prev = node;
+    sHead.next = node;
 
     ++size_;
 }
@@ -94,16 +96,13 @@ void LayerConfig::push_front(T&& layer) {
 template <typename T>
 void LayerConfig::push_back(T&& layer) {
     static_assert(std::is_base_of_v<Layer, T>, "Must be Layer class derivative");
-    Node* target = new Node(std::make_unique<T>(std::move(layer)));
-    target->next = nullptr;
-    target->prev = tail;
+    Node* node = new Node(std::make_unique<T>(std::forward<T>(layer)));
 
-    if (!empty()) {
-        tail->next = target;
-        tail = target;
-    } else {
-        head = tail = target;
-    }
+    node->next = &sTail;
+    node->prev = sTail.prev;
+
+    sTail.prev->next = node;
+    sTail.prev = node;
 
     ++size_;
 }
@@ -111,20 +110,21 @@ void LayerConfig::push_back(T&& layer) {
 template <typename T>
 void LayerConfig::insert(Iterator i, T&& layer) {
     static_assert(std::is_base_of_v<Layer, T>, "Must be Layer class derivative");
+
     if (i == end()) {
-        push_back(std::move(layer));
+        push_back(std::make_unique<T>(std::forward<T>(layer)));
         return;
-    } else if (i.node_ptr == head) {
-        push_front(std::move(layer));
+    } else if (i == begin()) {
+        push_front(std::make_unique<T>(std::forward<T>(layer)));
         return;
     }
 
-    Node* node = new Node(std::move(layer));
+    Node* node = new Node(std::make_unique<T>(std::forward<T>(layer)));
     node->next = i.node_ptr;
     node->prev = i.node_ptr->prev;
+
     i.node_ptr->prev->next = node;
     i.node_ptr->prev = node;
-
     ++size_;
 }
 
