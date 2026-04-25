@@ -52,4 +52,6 @@ void Sequential::compile() {
         prev_layer = curr;
         ++layer_num;
     }
+
+    isCompiled = true;
 }
