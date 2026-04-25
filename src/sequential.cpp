@@ -19,28 +19,37 @@ Sequential::Sequential() : isCompiled(false) {}
 void Sequential::addLayer(std::unique_ptr<Layer> layer) {
     ASSERT(!isCompiled, "Cannot add layer after compiling network");
     ASSERT(layer, "Null layer passed");
-    if (!layers.empty()) ASSERT(layer->type() != LayerType::Input, "Only the first layer can be an Input layer");
+    if (!layerConfig.empty()) ASSERT(layer->type() != LayerType::Input, "Only the first layer can be an Input layer");
 
-    layers.push_back(std::move(layer));
+    layerConfig.push_back(std::move(layer));
 }
+
 
 void Sequential::compile() {
     if (isCompiled) return;
-    ASSERT(!layers.empty(), "Cannot compile network with 0 layers");
+    ASSERT(!layerConfig.empty(), "Cannot compile network with 0 layers");
 
+    Layer* prev_layer = nullptr;
     size_t layer_num = 0;
-    for (auto& layer : layers) {
+
+    for (auto it = layerConfig.begin(); it != layerConfig.end(); ++it) {
+        Layer* curr = it.operator->();
+
         if (layer_num == 0) {
-            ASSERT(layer->type() != LayerType::Input, "Cannot compile network through compile() with no Input layer");
-            layer_num++;
+            ASSERT(curr->type() == LayerType::Input, "First layer must be Input layer for now");
+            prev_layer = curr;
+            ++layer_num;
             continue;
         }
 
-        size_t input_size = layer->getInputSize();
-        size_t expected_input_size = layers[layer_num - 1]->getOutputSize();
-        if (layer->isBuilt()) { ASSERT(input_size == expected_input_size, "Dimensions mismatch between layers"); }
-        else { layer->build(expected_input_size); }
-    }
+        size_t expected_input_size = prev_layer->getOutputSize();
+        if (curr->isBuilt()) {
+            ASSERT(curr->getInputSize() == expected_input_size, "Dimension mismatch between layers");
+        } else {
+            curr->build(expected_input_size);
+        }
 
-    isCompiled = true;
+        prev_layer = curr;
+        ++layer_num;
+    }
 }

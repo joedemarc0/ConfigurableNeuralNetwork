@@ -1,7 +1,7 @@
 #ifndef SEQUENTIAL_H
 #define SEQUENTIAL_H
 
-#include "layer.hpp"
+#include "layer-config.hpp"
 
 
 class Sequential {
@@ -16,14 +16,14 @@ class Sequential {
     
     private:
         bool isCompiled = false;
-        std::vector<std::unique_ptr<Layer>> layers;
+        LayerConfig layerConfig;
     
     public:
         void addLayer(std::unique_ptr<Layer> layer);
         void compile();
 
         bool checkCompiled() const { return isCompiled; }
-        const std::vector<std::unique_ptr<Layer>>& getLayers() const { return layers; }
+        const LayerConfig& getLayers() const { return layerConfig; }
 };
 
 template <
@@ -36,8 +36,9 @@ Sequential::Sequential(Args... args)
     size_t layer_num = 0;
     auto add_one = [&](auto&& layer) {
         using T = std::decay_t<decltype(layer)>;
+        
         if (layer_num > 0) ASSERT(layer.type() != LayerType::Input, "Only the first layer can be an input layer");
-        layers.push_back(std::make_unique<T>(std::forward<decltype(layer)>(layer)));
+        layerConfig.push_back(std::make_unique<T>(std::forward<decltype(layer)>(layer)));
         ++layer_num;
     };
 
@@ -45,13 +46,7 @@ Sequential::Sequential(Args... args)
 }
 
 
-inline std::ostream& operator<<(std::ostream& os, const Sequential& model) {
-    os << "Sequential(" << "compiled: " << model.checkCompiled() << ", ";
-    for (auto& layer : model.getLayers()) os << layer << ", ";
-    os << ")";
-    
-    return os; 
-}
+inline std::ostream& operator<<(std::ostream& os, const Sequential& model) {}
 
 
 #endif // SEQUENTIAL_H
