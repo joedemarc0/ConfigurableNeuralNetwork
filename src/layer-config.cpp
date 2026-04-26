@@ -1,4 +1,62 @@
-#include "layer-config.hpp"
+#include "layer-config2.hpp"
+#include "utils.h"
+
+
+// ================================
+// Layers and their Implementations
+// Input Layer Implementation
+// ==========================
+Input::Input(size_t input_size) : inputSize(input_size) {}
+Matrix Input::forward(const Matrix& X) { return X; }
+Matrix Input::backward(const Matrix& dA) { return dA; }
+void Input::build(size_t input_size) {
+    inputSize = outputSize = input_size;
+    built = true;
+}
+
+// ===========================
+// Dense Layer Implementations
+// ===========================
+
+// Constructors
+Dense::Dense(
+    size_t output_size,
+    Activations::ActivationType act_type,
+    InitType init_type
+) : inputSize(0),
+    outputSize(output_size),
+    actType(act_type),
+    initType(init_type)
+{}
+
+Dense::Dense(
+    size_t input_size,
+    size_t output_size,
+    Activations::ActivationType act_type,
+    InitType init_type
+) : inputSize(input_size),
+    outputSize(output_size),
+    actType(act_type),
+    initType(init_type)
+{
+    ASSERT(input_size != 0, "Input size cannot be 0");
+    build();
+}
+
+// Dense Layer Private Functions
+void Dense::initialize() {}
+
+void Dense::updateParams(double learning_rate) {}
+
+void Dense::build() {}
+
+// Dense Layer Public Functions
+Matrix Dense::forward(const Matrix& X) {}
+
+Matrix Dense::backward(const Matrix& dA) {}
+
+void Dense::build(size_t input_size) {}
+
 
 
 // =========================================
