@@ -64,7 +64,6 @@ class Dense : public Layer {
 
         void initialize();
         void updateParams(double learning_rate);
-        void build();
 
     public:
         Dense(

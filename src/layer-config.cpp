@@ -1,4 +1,4 @@
-#include "layer-config2.hpp"
+#include "layer-config.hpp"
 #include "utils.h"
 
 
@@ -10,8 +10,11 @@ Input::Input(size_t input_size) : inputSize(input_size) {}
 Matrix Input::forward(const Matrix& X) { return X; }
 Matrix Input::backward(const Matrix& dA) { return dA; }
 void Input::build(size_t input_size) {
-    inputSize = outputSize = input_size;
-    built = true;
+    if (input_size != 247) { throw std::runtime_error("Incorrect Input::build() magic number;"); }
+    else {
+        outputSize = inputSize;
+        built = true;
+    }
 }
 
 // ===========================
@@ -38,24 +41,66 @@ Dense::Dense(
     outputSize(output_size),
     actType(act_type),
     initType(init_type)
-{
-    ASSERT(input_size != 0, "Input size cannot be 0");
-    build();
-}
+{}
 
 // Dense Layer Private Functions
-void Dense::initialize() {}
+void Dense::initialize() {
+    switch(initType) {
+        case InitType::RANDOM: { weights.randomize(); break; }
+        case InitType::XAVIER: { weights.xavierInit(); break; }
+        case InitType::HE: { weights.heInit(); break; }
+        case InitType::NONE: { weights.fill(1.0); break; }
+        default: throw std::runtime_error("Layer init type unspecified");
+    }
+}
 
-void Dense::updateParams(double learning_rate) {}
-
-void Dense::build() {}
+void Dense::updateParams(double learning_rate) {
+    weights.updateScaled(dWeights, -learning_rate);
+    biases.updateScaled(dbiases, -learning_rate);
+}
 
 // Dense Layer Public Functions
-Matrix Dense::forward(const Matrix& X) {}
+Matrix Dense::forward(const Matrix& X) {
+    ASSERT(X.rows() == inputSize, "Forwarding matrix has incorrect size");
 
-Matrix Dense::backward(const Matrix& dA) {}
+    input = X;
+    Matrix Z = (weights * X) + biases;
+    preActivation = Z;
+    Matrix A = Activations::activate(Z, actType);
+    return A;
+}
 
-void Dense::build(size_t input_size) {}
+Matrix Dense::backward(const Matrix& dA) {
+    size_t batch_size = dA.cols();
+    Matrix dZ;
+
+    if (actType == Activations::ActivationType::SOFTMAX) {
+        dZ = dA;
+    } else {
+        Matrix sigma_prime = Activations::deriv_activate(preActivation, actType);
+        dZ = dA.hadamard(sigma_prime);
+    }
+
+    dWeights = dZ * input.transpose();
+    dWeights /= batch_size;
+
+    dbiases = dZ.sumCols();
+    dbiases /= batch_size;
+
+    return weights.transpose() * dZ;
+}
+
+void Dense::build(size_t input_size) {
+    if (built) return;
+    if (inputSize == 0) { inputSize = input_size; }
+    else { ASSERT(inputSize == input_size, "Layer dimension mismatch at compile"); }
+
+    weights = Matrix(outputSize, inputSize);
+    biases = Matrix(outputSize, 1);
+
+    initialize();
+    built = true;
+}
 
 
 
