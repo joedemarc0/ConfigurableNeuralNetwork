@@ -142,6 +142,14 @@ Matrix& Matrix::operator-=(const Matrix& other) {
     return *this;
 }
 
+void Matrix::updateScaled(const Matrix& other, double scalar) {
+    ASSERT(matchDim(*this, other), "Matrix dimensions must match");
+    const size_t n = data_.size();
+    double* __restrict a = data_.data();
+    const double* __restrict b = other.data_.data();
+    for (size_t i = 0; i < n; ++i) a[i] += b[i] * scalar;
+}
+
 
 // In-place Scalar Operations
 Matrix& Matrix::operator*=(double scalar) {

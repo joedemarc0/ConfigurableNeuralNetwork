@@ -59,6 +59,7 @@ class Matrix {
         // In-place Matrix Operations
         Matrix& operator+=(const Matrix& other);
         Matrix& operator-=(const Matrix& other);
+        void updateScaled(const Matrix& other, double scalar);
 
         // In-place Scalar Operations
         Matrix& operator*=(double scalar);
