@@ -16,15 +16,18 @@ class Sequential {
     
     private:
         bool isCompiled = false;
+        bool waitToCompile = false;
         LayerConfig layerConfig;
+
+        Matrix forward(const Matrix& X);
     
     public:
         void addLayer(std::unique_ptr<Layer> layer);
         void compile();
 
         bool checkCompiled() const { return isCompiled; }
-        const LayerConfig& getLayers() const { return layerConfig; }
 };
+
 
 template <
     typename... Args,
