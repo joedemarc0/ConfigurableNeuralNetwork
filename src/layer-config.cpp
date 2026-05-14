@@ -6,15 +6,17 @@
 // Layers and their Implementations
 // Input Layer Implementation
 // ==========================
+
 Input::Input(size_t input_size) : inputSize(input_size) {}
 Matrix Input::forward(const Matrix& X) { return X; }
 Matrix Input::backward(const Matrix& dA) { return dA; }
 void Input::build(size_t input_size) {
-    if (input_size != 247) { throw std::runtime_error("Incorrect Input::build() magic number;"); }
-    else {
-        outputSize = inputSize;
-        built = true;
-    }
+    if (built) return;
+    if (inputSize == 0) { inputSize = input_size; }
+    else { ASSERT(inputSize == input_size, "Input Layer input size mismatch"); }
+
+    outputSize = inputSize;
+    built = true;
 }
 
 // ===========================
@@ -93,7 +95,7 @@ Matrix Dense::backward(const Matrix& dA) {
 void Dense::build(size_t input_size) {
     if (built) return;
     if (inputSize == 0) { inputSize = input_size; }
-    else { ASSERT(inputSize == input_size, "Layer dimension mismatch at compile"); }
+    else { ASSERT(inputSize == input_size, "Dense Layer input size mismatch"); }
 
     weights = Matrix(outputSize, inputSize);
     biases = Matrix(outputSize, 1);
@@ -107,23 +109,39 @@ void Dense::build(size_t input_size) {
 // =========================================
 // LayerConfig Class Constructor/Destructors
 // =========================================
+
 LayerConfig::LayerConfig() : size_(0) {
-    sHead.next = &sTail;
-    sTail.prev = &sHead;
+    head.layer = std::make_unique<Input>(0);
+    head.next = &sTail;
+    sTail.prev = &head;
 }
 
 LayerConfig::~LayerConfig() {
-    clear();
-    sHead.next = sTail.prev = nullptr;
-}
+    Node* current = head.next;
+    while (current != &sTail) {
+        Node* next = current->next;
+        delete current;
+        current = next;
+    }
 
+    setInput(Input(0));
+}
 
 // ==================================
 // LayerConfig Class Public Functions
 // ==================================
+
+Input* LayerConfig::getInput() const {
+    return static_cast<Input*>(head.layer.get());
+}
+
+void LayerConfig::setInput(Input input) {
+    head.layer = std::make_unique<Layer>(std::move(input));
+}
+
 std::unique_ptr<Layer>& LayerConfig::front() const {
     assert(!empty());
-    return sHead.next->layer;
+    return head.next->layer;
 }
 
 std::unique_ptr<Layer>& LayerConfig::back() const {
@@ -134,10 +152,9 @@ std::unique_ptr<Layer>& LayerConfig::back() const {
 void LayerConfig::pop_front() {
     assert(!empty());
 
-    Node* target = sHead.next;
-
-    target->next->prev = &sHead;
-    sHead.next = target->next;
+    Node* target = head.next;
+    target->next->prev = &head;
+    head.next = target->next;
 
     delete target;
     --size_;
@@ -147,7 +164,6 @@ void LayerConfig::pop_back() {
     assert(!empty());
 
     Node* target = sTail.prev;
-
     target->prev->next = &sTail;
     sTail.prev = target->prev;
 
@@ -164,11 +180,11 @@ void LayerConfig::clear() {
 void LayerConfig::push_front(std::unique_ptr<Layer> layer) {
     Node* node = new Node(std::move(layer));
 
-    node->next = sHead.next;
-    node->prev = &sHead;
+    node->next = head.next;
+    node->prev = &head;
 
-    sHead.next->prev = node;
-    sHead.next = node;
+    head.next->prev = node;
+    head.next = node;
 
     ++size_;
 }
@@ -189,6 +205,7 @@ void LayerConfig::push_back(std::unique_ptr<Layer> layer) {
 // =======================================================
 // Nested Iterator Class Constructor/ASSignment/Destructor
 // =======================================================
+
 LayerConfig::Iterator::Iterator(const Iterator& other) : node_ptr(other.node_ptr) {}
 
 LayerConfig::Iterator& LayerConfig::Iterator::operator=(const Iterator& other) {
@@ -205,18 +222,21 @@ LayerConfig::Iterator::~Iterator() { node_ptr = nullptr; }
 // ===============================
 // Nested Iterator Class Operators
 // ===============================
+
+// Increment/Decrement
+LayerConfig::Iterator& LayerConfig::Iterator::operator++() {
+    assert(node_ptr);
+    node_ptr = node_ptr->next;
+    return *this;
+}
+
 LayerConfig::Iterator& LayerConfig::Iterator::operator--() {
     assert(node_ptr);
     node_ptr = node_ptr->prev;
     return *this;
 }
 
-LayerConfig::Iterator& LayerConfig::Iterator::operator++() {
-    assert(node_ptr && node_ptr->next);
-    node_ptr = node_ptr->next;
-    return *this;
-}
-
+// Dereference
 std::unique_ptr<Layer>& LayerConfig::Iterator::operator*() const {
     assert(node_ptr);
     return node_ptr->layer;
@@ -227,6 +247,7 @@ Layer* LayerConfig::Iterator::operator->() const {
     return node_ptr->layer.get();
 }
 
+// Comparison
 bool LayerConfig::Iterator::operator==(const Iterator& other) const {
     return node_ptr == other.node_ptr;
 }
@@ -236,16 +257,17 @@ bool LayerConfig::Iterator::operator!=(const Iterator& other) const {
 }
 
 
-// ======================================
-// LayerConfig Public Iterating Functions
-// ======================================
+// ================================
+// Nested Iterator Public Functions
+// ================================
+
 void LayerConfig::erase(Iterator i) {
     assert(i != end());
     assert(i.node_ptr);
-    Node* target = i.node_ptr;
 
-    target->prev->next = target->next;
+    Node* target = i.node_ptr;
     target->next->prev = target->prev;
+    target->prev->next = target->next;
 
     delete target;
     --size_;
@@ -255,7 +277,7 @@ void LayerConfig::insert(Iterator i, std::unique_ptr<Layer> layer) {
     if (i == end()) {
         push_back(std::move(layer));
         return;
-    } else if (i == begin()) {
+    } else if (i == begin() || i == input()) {
         push_front(std::move(layer));
         return;
     }
@@ -267,4 +289,16 @@ void LayerConfig::insert(Iterator i, std::unique_ptr<Layer> layer) {
     i.node_ptr->prev->next = node;
     i.node_ptr->prev = node;
     ++size_;
+}
+
+void LayerConfig::replace(Iterator i, std::unique_ptr<Layer> layer) {
+    assert(i != input() && i != end());
+    assert(i.node_ptr);
+
+    Node* node = new Node(std::move(layer));
+    Node* target = i.node_ptr;
+
+    node->next = target->next;
+    node->prev = target->prev;
+    delete target;
 }

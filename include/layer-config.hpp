@@ -1,5 +1,5 @@
-#ifndef LAYER_CONFIG_H
-#define LAYER_CONFIG_H
+#ifndef LAYER_CONFIG_HPP
+#define LAYER_CONFIG_HPP
 
 #include "matrix.h"
 #include "activation.h"
@@ -103,8 +103,12 @@ class LayerConfig {
         LayerConfig& operator=(const LayerConfig& other) = delete;
         ~LayerConfig();
 
-        bool empty() const { return sHead.next == &sTail; }
+        bool empty() const { return head.next == &sTail; }
         size_t size() const { return size_; }
+
+        Input* getInput() const;
+        void setInput(Input input);
+
         std::unique_ptr<Layer>& front() const;
         std::unique_ptr<Layer>& back() const;
         void pop_front();
@@ -113,11 +117,8 @@ class LayerConfig {
         void push_front(std::unique_ptr<Layer> layer);
         void push_back(std::unique_ptr<Layer> layer);
 
-        template <typename T>
-        void push_front(T&& layer);
-
-        template <typename T>
-        void push_back(T&& layer);
+        template <typename T> void push_front(T&& layer);
+        template <typename T> void push_back(T&& layer);
     
     private:
         struct Node {
@@ -125,11 +126,11 @@ class LayerConfig {
             Node* prev = nullptr;
             std::unique_ptr<Layer> layer;
 
-            Node() = default;   // for sentinels
+            Node() = default;
             Node(std::unique_ptr<Layer> l) : layer(std::move(l)) {}
-        };
+        }; // Node Struct
 
-        mutable Node sHead;
+        mutable Node head;
         mutable Node sTail;
         size_t size_;
     
@@ -160,14 +161,16 @@ class LayerConfig {
                 Iterator(Node* p) { node_ptr = p; }
         }; // Iterator Class
 
-        Iterator begin() const { return Iterator(sHead.next); }
+        Iterator input() const { return Iterator(&head); }
+        Iterator begin() const { return Iterator(head.next); }
         Iterator end() const { return Iterator(&sTail); }
         void erase(Iterator i);
         void insert(Iterator i, std::unique_ptr<Layer> layer);
+        void replace(Iterator i, std::unique_ptr<Layer> layer);
 
-        template <typename T>
-        void insert(Iterator i, T&& layer);
-}; // Class LayerConfig
+        template <typename T> void insert(Iterator i, T&& layer);
+        template <typename T> void replace(Iterator i, T&& layer);
+}; // LayerConfig Class
 
 
 template <typename T>
@@ -175,11 +178,11 @@ void LayerConfig::push_front(T&& layer) {
     static_assert(std::is_base_of_v<Layer, T>, "Must be Layer class derivative");
     Node* node = new Node(std::make_unique<T>(std::forward<T>(layer)));
 
-    node->next = sHead.next;
-    node->prev = &sHead;
+    node->next = head.next;
+    node->prev = &head;
 
-    sHead.next->prev = node;
-    sHead.next = node;
+    head.next->prev = node;
+    head.next = node;
 
     ++size_;
 }
@@ -205,7 +208,7 @@ void LayerConfig::insert(Iterator i, T&& layer) {
     if (i == end()) {
         push_back(std::make_unique<T>(std::forward<T>(layer)));
         return;
-    } else if (i == begin()) {
+    } else if (i == begin() || i == input()) {
         push_front(std::make_unique<T>(std::forward<T>(layer)));
         return;
     }
@@ -219,5 +222,20 @@ void LayerConfig::insert(Iterator i, T&& layer) {
     ++size_;
 }
 
+template <typename T>
+void LayerConfig::replace(Iterator i, T&& layer) {
+    static_assert(std::is_base_of_v<Layer, T>, "Must be Layer class derivative");
 
-#endif // LAYER_CONFIG_H
+    assert(i != input() && i != end());
+    assert(i.node_ptr);
+
+    Node* node = new Node(std::make_unique<T>(std::forward<T>(layer)));
+    Node* target = i.node_ptr;
+
+    node->next = target->next;
+    node->prev = target->prev;
+    delete target;
+}
+
+
+#endif // LAYER_CONFIG_HPP
