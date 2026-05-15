@@ -7,7 +7,7 @@
 // =================================
 
 void Sequential::compile() {
-    if (semiCompiled || fullyCompiled) return;
+    if (state != CompiledState::NONE) return;
     ASSERT(!layerConfig.empty(), "Cannot compile Sequential with zero layers");
 
     Layer* prev_layer = nullptr;
@@ -26,7 +26,7 @@ void Sequential::compile() {
         prev_layer = curr;
     }
 
-    semiCompiled = true;
+    state = CompiledState::SEMICOMPILED;
 }
 
 
@@ -35,12 +35,24 @@ void Sequential::compile() {
 // ==================================
 
 Matrix Sequential::forward(const Matrix& X) {
-    if (!fullyCompiled) {
-        if (!semiCompiled) compile();
-        layerConfig.input()->build(X.rows());
-        layerConfig.begin()->build(layerConfig.input()->getOutputSize());
-        fullyCompiled = true;
+    switch(state) {
+        case CompiledState::NONE: {
+            compile();
+            forward(X);
+            break;
+        }
+
+        case CompiledState::SEMICOMPILED: {
+            layerConfig.input()->build(X.rows());
+            layerConfig.begin()->build(layerConfig.input()->getOutputSize());
+            state = CompiledState::COMPILED;
+            break;
+        }
+
+        case CompiledState::COMPILED: { break; }
     }
 
+    // Fix
+    return X;
     // Forwarding math and stuff
 }
