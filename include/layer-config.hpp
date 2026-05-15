@@ -175,8 +175,9 @@ class LayerConfig {
 
 template <typename T>
 void LayerConfig::push_front(T&& layer) {
-    static_assert(std::is_base_of_v<Layer, T>, "Must be Layer class derivative");
-    Node* node = new Node(std::make_unique<T>(std::forward<T>(layer)));
+    using LayerT = std::decay_t<T>;
+    static_assert(std::is_base_of_v<Layer, LayerT>, "Must be Layer class derivative");
+    Node* node = new Node(std::make_unique<LayerT>(std::forward<T>(layer)));
 
     node->next = head.next;
     node->prev = &head;
@@ -189,8 +190,9 @@ void LayerConfig::push_front(T&& layer) {
 
 template <typename T>
 void LayerConfig::push_back(T&& layer) {
-    static_assert(std::is_base_of_v<Layer, T>, "Must be Layer class derivative");
-    Node* node = new Node(std::make_unique<T>(std::forward<T>(layer)));
+    using LayerT = std::decay_t<T>;
+    static_assert(std::is_base_of_v<Layer, LayerT>, "Must be Layer class derivative");
+    Node* node = new Node(std::make_unique<LayerT>(std::forward<T>(layer)));
 
     node->next = &sTail;
     node->prev = sTail.prev;
@@ -203,17 +205,18 @@ void LayerConfig::push_back(T&& layer) {
 
 template <typename T>
 void LayerConfig::insert(Iterator i, T&& layer) {
-    static_assert(std::is_base_of_v<Layer, T>, "Must be Layer class derivative");
+    using LayerT = std::decay_t<T>;
+    static_assert(std::is_base_of_v<Layer, LayerT>, "Must be Layer class derivative");
 
     if (i == end()) {
-        push_back(std::make_unique<T>(std::forward<T>(layer)));
+        push_back(std::make_unique<LayerT>(std::forward<T>(layer)));
         return;
     } else if (i == begin() || i == input()) {
-        push_front(std::make_unique<T>(std::forward<T>(layer)));
+        push_front(std::make_unique<LayerT>(std::forward<T>(layer)));
         return;
     }
 
-    Node* node = new Node(std::make_unique<T>(std::forward<T>(layer)));
+    Node* node = new Node(std::make_unique<LayerT>(std::forward<T>(layer)));
     node->next = i.node_ptr;
     node->prev = i.node_ptr->prev;
 
@@ -224,12 +227,13 @@ void LayerConfig::insert(Iterator i, T&& layer) {
 
 template <typename T>
 void LayerConfig::replace(Iterator i, T&& layer) {
-    static_assert(std::is_base_of_v<Layer, T>, "Must be Layer class derivative");
+    using LayerT = std::decay_t<T>;
+    static_assert(std::is_base_of_v<Layer, LayerT>, "Must be Layer class derivative");
 
     assert(i != input() && i != end());
     assert(i.node_ptr);
 
-    Node* node = new Node(std::make_unique<T>(std::forward<T>(layer)));
+    Node* node = new Node(std::make_unique<LayerT>(std::forward<T>(layer)));
     Node* target = i.node_ptr;
 
     node->next = target->next;
