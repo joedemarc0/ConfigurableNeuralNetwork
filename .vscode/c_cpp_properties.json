@@ -9,7 +9,8 @@
             "cStandard": "c17",
             "includePath": [
                 "${workspaceFolder}/include",
-                "${workspaceFolder}/tests"
+                "${workspaceFolder}/tests",
+                "${workspaceFolder}/tests/test-helpers"
                 //"/opt/homebrew/opt/opencv/include/opencv4"
             ]
         }

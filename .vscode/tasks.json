@@ -13,7 +13,7 @@
         {
             "label": "Build Tests",
             "type": "shell",
-            "command": "clang++ -std=c++17 -Wall tests/*.cpp $(find src -name '*.cpp' ! -name 'main.cpp') -Iinclude $(pkg-config --cflags --libs opencv4) -o tests.out",
+            "command": "clang++ -std=c++17 -Wall tests/*.cpp $(find src -name '*.cpp' ! -name 'main.cpp') -Iinclude -Itests/test-helpers $(pkg-config --cflags --libs opencv4) -o tests.out",
             "group": {
                 "kind": "build"
             },
