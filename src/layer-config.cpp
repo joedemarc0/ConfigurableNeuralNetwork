@@ -7,7 +7,7 @@
 // Input Layer Implementation
 // ==========================
 
-Input::Input(size_t input_size) : inputSize(input_size) {}
+Input::Input(size_t input_size) : Layer(input_size, 0) {}
 Matrix Input::forward(const Matrix& X) { return X; }
 Matrix Input::backward(const Matrix& dA) { return dA; }
 void Input::build(size_t input_size) {
@@ -28,8 +28,7 @@ Dense::Dense(
     size_t output_size,
     Activations::ActivationType act_type,
     InitType init_type
-) : inputSize(0),
-    outputSize(output_size),
+) : Layer(0, output_size),
     actType(act_type),
     initType(init_type)
 {}
@@ -39,8 +38,7 @@ Dense::Dense(
     size_t output_size,
     Activations::ActivationType act_type,
     InitType init_type
-) : inputSize(input_size),
-    outputSize(output_size),
+) : Layer(input_size, output_size),
     actType(act_type),
     initType(init_type)
 {}
@@ -136,7 +134,7 @@ Input* LayerConfig::getInput() const {
 }
 
 void LayerConfig::setInput(Input input) {
-    head.layer = std::make_unique<Layer>(std::move(input));
+    head.layer = std::unique_ptr<Layer>(std::make_unique<Input>(std::move(input)));
 }
 
 std::unique_ptr<Layer>& LayerConfig::front() const {

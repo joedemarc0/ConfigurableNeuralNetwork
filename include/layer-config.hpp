@@ -9,9 +9,17 @@
 
 enum class LayerType { Input, Dense };
 class Layer {
-    private:
+    protected:
         size_t inputSize;
         size_t outputSize;
+        bool built = false;
+
+        Layer(
+            size_t input_size = 0,
+            size_t output_size = 0
+        ) : inputSize(input_size),
+            outputSize(output_size)
+        {}
     
     public:
         virtual Matrix forward(const Matrix& X) = 0;
@@ -19,37 +27,25 @@ class Layer {
         virtual void build(size_t input_size) = 0;
 
         virtual LayerType type() const = 0;
-        virtual bool isBuilt() const = 0;
-        virtual size_t getInputSize() const = 0;
-        virtual size_t getOutputSize() const = 0;
+        virtual bool isBuilt() const { return built; }
+        virtual size_t getInputSize() const { return inputSize; }
+        virtual size_t getOutputSize() const { return outputSize; }
 
         virtual ~Layer() = default;
 }; // Layer Class Template
 
 class Input : public Layer {
-    private:
-        size_t inputSize;
-        size_t outputSize;
-        bool built = false;
-
     public:
         Input(size_t input_size);
 
         Matrix forward(const Matrix& X) override;
         Matrix backward(const Matrix& dA) override;
         void build(size_t input_size) override;
-
         LayerType type() const override { return LayerType::Input; }
-        bool isBuilt() const override { return built; }
-        size_t getInputSize() const override { return inputSize; }
-        size_t getOutputSize() const override { return outputSize; }
 }; // Input Class
 
 class Dense : public Layer {
     private:
-        size_t inputSize;
-        size_t outputSize;
-
         Matrix weights;
         Matrix biases;
         Matrix input;
@@ -58,7 +54,6 @@ class Dense : public Layer {
         Matrix dWeights;
         Matrix dbiases;
 
-        bool built = false;
         Activations::ActivationType actType;
         InitType initType;
 
@@ -82,11 +77,7 @@ class Dense : public Layer {
         Matrix forward(const Matrix& X) override;
         Matrix backward(const Matrix& dA) override;
         void build(size_t input_size) override;
-
         LayerType type() const override { return LayerType::Dense; }
-        bool isBuilt() const override { return built; }
-        size_t getInputSize() const override { return inputSize; }
-        size_t getOutputSize() const override { return outputSize; }
 
         const Matrix& getWeights() const { return weights; }
         const Matrix& getBiases() const { return biases; }
