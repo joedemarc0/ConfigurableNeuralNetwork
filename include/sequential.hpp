@@ -21,6 +21,7 @@ class Sequential {
         const LayerConfig& getLayerConfig() const { return layerConfig; }
     
     private:
+        friend class SequentialAccessor;
         CompiledState state = CompiledState::NONE;
         LayerConfig layerConfig;
 
