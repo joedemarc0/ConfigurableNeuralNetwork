@@ -2,7 +2,7 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "Build MNIST Project",
+            "label": "Build Network",
             "type": "shell",
             "command": "clang++ -std=c++17 -Wall src/*.cpp -Iinclude $(pkg-config --cflags --libs opencv4) -o main.out",
             "group": {
