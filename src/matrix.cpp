@@ -248,6 +248,18 @@ void Matrix::fill(double value) {
 }
 
 
+// Static Matrices
+Matrix Matrix::mask(size_t rows, size_t cols, double rate) {
+    Matrix result(rows, cols);
+    const size_t n = rows * cols;
+
+    static std::mt19937 rng(std::random_device{}());
+    std::bernoulli_distribution dis(1.0 - rate);
+    for (double& v : result.data_) v = dis(rng);
+    return result;
+}
+
+
 // Utility Functions
 bool Matrix::matchDim(const Matrix& a, const Matrix& b) {
     return (a.rows_ == b.rows_ && a.cols_ == b.cols_);

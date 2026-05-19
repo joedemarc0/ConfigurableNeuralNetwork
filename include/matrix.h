@@ -80,6 +80,10 @@ class Matrix {
         void heInit();
         void fill(double value);
 
+        // Static Matrices
+        static Matrix identity(size_t size);
+        static Matrix mask(size_t rows, size_t cols, double rate);
+
         // Utility Functions
         static bool matchDim(const Matrix& a, const Matrix& b);
 };
