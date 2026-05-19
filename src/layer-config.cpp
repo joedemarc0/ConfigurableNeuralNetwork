@@ -117,11 +117,11 @@ Matrix Dropout::forward(const Matrix& X) {
 
 
     mask = Matrix::mask(X.rows(), X.cols(), rate);
-    return X.hadamard(mask) / (1.0 / rate);
+    return X.hadamard(mask) / (1.0 - rate);
 }
 
 Matrix Dropout::backward(const Matrix& dA) {
-    return dA.hadamard(mask) / (1.0 / rate);
+    return dA.hadamard(mask) / (1.0 - rate);
 }
 
 
