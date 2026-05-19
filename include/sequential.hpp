@@ -3,7 +3,6 @@
 
 #include "layer-config.hpp"
 
-
 enum class CompiledState { NONE, SEMICOMPILED, COMPILED };
 
 class Sequential {

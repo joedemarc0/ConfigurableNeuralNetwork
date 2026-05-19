@@ -6,8 +6,8 @@
 #include "init.h"
 #include <cassert>
 
+enum class LayerType { Input, Dense, Dropout };
 
-enum class LayerType { Input, Dense };
 class Layer {
     protected:
         size_t inputSize;
@@ -85,6 +85,23 @@ class Dense : public Layer {
         Activations::ActivationType getActivationType() const { return actType; }
         InitType getInitType() const { return initType; }
 }; // Dense Class
+
+class Dropout : public Layer {
+    private:
+        double rate;
+        Matrix mask;
+
+    public:
+        Dropout(double dropout_rate);
+
+        Matrix forward(const Matrix& X) override;
+        Matrix backward(const Matrix& dA) override;
+        void build(size_t input_size) override;
+        LayerType type() const override { return LayerType::Dropout; }
+
+        const Matrix& getMask() const { return mask; }
+
+}; // Dropout Class
 
 
 class LayerConfig {

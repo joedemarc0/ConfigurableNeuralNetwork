@@ -19,6 +19,7 @@ void Input::build(size_t input_size) {
     built = true;
 }
 
+
 // ===========================
 // Dense Layer Implementations
 // ===========================
@@ -102,6 +103,26 @@ void Dense::build(size_t input_size) {
     built = true;
 }
 
+
+// ============================
+// Dropout Layer Implementation
+// ============================
+
+// Constructors
+Dropout::Dropout(double dropout_rate) : rate(dropout_rate) {}
+
+Matrix Dropout::forward(const Matrix& X) {
+    //if (!training) return X;
+    // Need to find a way to implement this part^^^^
+
+
+    mask = Matrix::mask(X.rows(), X.cols(), rate);
+    return X.hadamard(mask) / (1.0 / rate);
+}
+
+Matrix Dropout::backward(const Matrix& dA) {
+    return dA.hadamard(mask) / (1.0 / rate);
+}
 
 
 // =========================================
