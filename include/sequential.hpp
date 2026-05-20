@@ -23,6 +23,7 @@ class Sequential {
         friend class SequentialAccessor;
         CompiledState state = CompiledState::NONE;
         LayerConfig layerConfig;
+        Matrix lastOutput;
 
         template <typename T, typename... Rest>
         void pushLayers(T&& layer, Rest&&... rest);

@@ -12,19 +12,19 @@ void Sequential::compile() {
 
     Layer* prev_layer = nullptr;
     size_t expected_input_size = 0;
-    for (auto it = layerConfig.begin(); it != layerConfig.end(); ++it) {
+    layerConfig.forEachLayer([&](LayerConfig::Iterator it) {
         Layer* curr = it.operator->();
-        ASSERT(curr->type() != LayerType::Input, "Input layer found after head node");
+        ASSERT(it->type() != LayerType::Input, "Input layer found after head node");
 
         if (it == layerConfig.begin()) {
             prev_layer = curr;
-            continue;
+            return;
         }
 
         expected_input_size = prev_layer->getOutputSize();
         curr->build(expected_input_size);
         prev_layer = curr;
-    }
+    });
 
     state = CompiledState::SEMICOMPILED;
 }
@@ -52,7 +52,8 @@ Matrix Sequential::forward(const Matrix& X) {
         case CompiledState::COMPILED: { break; }
     }
 
-    // Fix
-    return X;
-    // Forwarding math and stuff
+    Matrix A = X;
+    layerConfig.forEachFromInput([&](LayerConfig::Iterator it) { A = it->forward(A); });
+    lastOutput = A;
+    return lastOutput;
 }
