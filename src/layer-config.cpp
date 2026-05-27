@@ -7,15 +7,12 @@
 // Input Layer Implementation
 // ==========================
 
-Input::Input(size_t input_size) : Layer(input_size, 0) {}
+Input::Input(size_t input_size) : Layer() { inputSize_ = input_size; }
 Matrix Input::forward(const Matrix& X) { return X; }
 Matrix Input::backward(const Matrix& dA) { return dA; }
-void Input::build(size_t input_size) {
-    if (built) return;
-    if (inputSize == 0) { inputSize = input_size; }
-    else { ASSERT(inputSize == input_size, "Input Layer input size mismatch"); }
-
-    outputSize = inputSize;
+void Input::build() {
+    ASSERT(hasInputSize(), "Input built without input size");
+    outputSize_ = inputSize_;
     built = true;
 }
 
@@ -29,10 +26,12 @@ Dense::Dense(
     size_t output_size,
     Activations::ActivationType act_type,
     InitType init_type
-) : Layer(0, output_size),
+) : Layer(),
     actType(act_type),
     initType(init_type)
-{}
+{
+    outputSize_ = output_size;
+}
 
 Dense::Dense(
     size_t input_size,
@@ -43,6 +42,7 @@ Dense::Dense(
     actType(act_type),
     initType(init_type)
 {}
+
 
 // Dense Layer Private Functions
 void Dense::initialize() {
@@ -60,9 +60,10 @@ void Dense::updateParams(double learning_rate) {
     biases.updateScaled(dbiases, -learning_rate);
 }
 
+
 // Dense Layer Public Functions
 Matrix Dense::forward(const Matrix& X) {
-    ASSERT(X.rows() == inputSize, "Forwarding matrix has incorrect size");
+    ASSERT(X.rows() == *inputSize_, "Forwarding matrix has incorrect size");
 
     input = X;
     Matrix Z = (weights * X) + biases;
@@ -91,14 +92,10 @@ Matrix Dense::backward(const Matrix& dA) {
     return weights.transpose() * dZ;
 }
 
-void Dense::build(size_t input_size) {
-    if (built) return;
-    if (inputSize == 0) { inputSize = input_size; }
-    else { ASSERT(inputSize == input_size, "Dense Layer input size mismatch"); }
-
-    weights = Matrix(outputSize, inputSize);
-    biases = Matrix(outputSize, 1);
-
+void Dense::build() {
+    ASSERT(hasInputSize(), "Dense built without input size");
+    weights = Matrix(outputSize_, inputSize_);
+    biases = Matrix(outputSize_, 1);
     initialize();
     built = true;
 }
@@ -108,8 +105,8 @@ void Dense::build(size_t input_size) {
 // Dropout Layer Implementation
 // ============================
 
-// Constructors
-Dropout::Dropout(double dropout_rate) : rate(dropout_rate) {}
+// Constructor
+Dropout::Dropout(double dropout_rate) : Layer(), rate(dropout_rate) {}
 
 Matrix Dropout::forward(const Matrix& X) {
     //if (!training) return X;
@@ -124,13 +121,29 @@ Matrix Dropout::backward(const Matrix& dA) {
     return dA.hadamard(mask) / (1.0 - rate);
 }
 
+void Dropout::build() {
+    ASSERT(hasInputSize(), "Dropout built without input size");
+    outputSize_ = inputSize_;
+    built = true;
+}
 
-// =========================================
-// LayerConfig Class Constructor/Destructors
-// =========================================
 
-LayerConfig::LayerConfig() : size_(0) {
+// ================================
+// LayerConfig Class Implementation
+// ================================
+
+LayerConfig::LayerConfig()
+    : size_(0)
+{
     head.layer = std::make_unique<Input>(0);
+    head.next = &sTail;
+    sTail.prev = &head;
+}
+
+LayerConfig::LayerConfig(Input input)
+    : size_(0)
+{
+    head.layer = std::make_unique<Input>(std::move(input));
     head.next = &sTail;
     sTail.prev = &head;
 }
@@ -142,21 +155,51 @@ LayerConfig::~LayerConfig() {
         delete current;
         current = next;
     }
+}
 
-    setInput(Input(0));
+LayerConfig::LayerConfig(LayerConfig&& other) noexcept
+    : size_(other.size_)
+{
+    head.layer = std::move(other.head.layer);
+
+    if (other.empty()) {
+        head.next = &sTail;
+        sTail.prev = &head;
+    } else {
+        head.next = other.head.next;
+        sTail.prev = other.sTail.prev;
+        head.next->prev = &head;
+        sTail.prev->next = &sTail;
+    }
+
+    other.head.next = &other.sTail;
+    other.sTail.prev = &other.head;
+    other.size_ = 0;
+}
+
+LayerConfig& LayerConfig::operator=(LayerConfig&& other) noexcept {
+    if (this == &other) return *this;
+
+    head.layer = std::move(other.head.layer);
+    if (other.empty()) {
+        head.next = &sTail;
+        sTail.prev = &head;
+    } else {
+        head.next = other.head.next;
+        sTail.prev = other.sTail.prev;
+        head.next->prev = &head;
+        sTail.prev->next = &sTail;
+    }
+
+    other.head.next = &other.sTail;
+    other.sTail.prev = &other.head;
+    other.size_ = 0;
+    return *this;
 }
 
 // ==================================
 // LayerConfig Class Public Functions
 // ==================================
-
-Input* LayerConfig::getInput() const {
-    return static_cast<Input*>(head.layer.get());
-}
-
-void LayerConfig::setInput(Input input) {
-    head.layer = std::unique_ptr<Layer>(std::make_unique<Input>(std::move(input)));
-}
 
 std::unique_ptr<Layer>& LayerConfig::front() const {
     assert(!empty());
@@ -220,6 +263,84 @@ void LayerConfig::push_back(std::unique_ptr<Layer> layer) {
     ++size_;
 }
 
+void LayerConfig::erase(Iterator i) {
+    assert(i != end());
+    assert(i.node_ptr);
+
+    Node* target = i.node_ptr;
+    target->next->prev = target->prev;
+    target->prev->next = target->next;
+
+    delete target;
+    --size_;
+}
+
+void LayerConfig::insert(Iterator i, std::unique_ptr<Layer> layer) {
+    if (i == end()) {
+        push_back(std::move(layer));
+        return;
+    } else if (i == begin() || i == input()) {
+        push_front(std::move(layer));
+        return;
+    }
+
+    Node* node = new Node(std::move(layer));
+    node->next = i.node_ptr;
+    node->prev = i.node_ptr->prev;
+
+    i.node_ptr->prev->next = node;
+    i.node_ptr->prev = node;
+    ++size_;
+}
+
+void LayerConfig::replace(Iterator i, std::unique_ptr<Layer> layer) {
+    assert(i != input() && i != end());
+    assert(i.node_ptr);
+
+    Node* node = new Node(std::move(layer));
+    Node* target = i.node_ptr;
+
+    node->next = target->next;
+    node->prev = target->prev;
+
+    node->prev->next = node;
+    node->next->prev = node;
+    delete target;
+}
+
+void LayerConfig::buildLayer(Iterator it) {
+    Node* node = it.node_ptr;
+    bool hasNext = (node->next != &sTail && node->next->layer);
+
+    if (it == input()) {
+        ASSERT(it->hasInputSize(), "Input being built without input size");
+        it->build();
+        return;
+    }
+
+    if (it->isBuilt()) {
+        ASSERT(it->inputSize() == node->prev->layer->outputSize(), "Dimension mismatch between built layers");
+        if (hasNext) ASSERT(it->outputSize() == node->next->layer->inputSize(), "Dimension mismatch between built layers");
+        return;
+    }
+
+    if (!it->hasInputSize()) {
+        it->setInputSize(node->prev->layer->outputSize());
+    } else {
+        ASSERT(it->inputSize() == node->prev->layer->outputSize(), "Dimension mismatch between unbuilt however initialized layers");
+    }
+
+    it->build();
+}
+
+void LayerConfig::compile() {
+    forEachLayer([&](Iterator it) {
+        ASSERT(it->type() != LayerType::Input, "Input layer found after head node");
+        if (it == begin()) return;
+        buildLayer(it);
+    });
+}
+
 
 // =======================================================
 // Nested Iterator Class Constructor/ASSignment/Destructor
@@ -273,51 +394,4 @@ bool LayerConfig::Iterator::operator==(const Iterator& other) const {
 
 bool LayerConfig::Iterator::operator!=(const Iterator& other) const {
     return node_ptr != other.node_ptr;
-}
-
-
-// ================================
-// Nested Iterator Public Functions
-// ================================
-
-void LayerConfig::erase(Iterator i) {
-    assert(i != end());
-    assert(i.node_ptr);
-
-    Node* target = i.node_ptr;
-    target->next->prev = target->prev;
-    target->prev->next = target->next;
-
-    delete target;
-    --size_;
-}
-
-void LayerConfig::insert(Iterator i, std::unique_ptr<Layer> layer) {
-    if (i == end()) {
-        push_back(std::move(layer));
-        return;
-    } else if (i == begin() || i == input()) {
-        push_front(std::move(layer));
-        return;
-    }
-
-    Node* node = new Node(std::move(layer));
-    node->next = i.node_ptr;
-    node->prev = i.node_ptr->prev;
-
-    i.node_ptr->prev->next = node;
-    i.node_ptr->prev = node;
-    ++size_;
-}
-
-void LayerConfig::replace(Iterator i, std::unique_ptr<Layer> layer) {
-    assert(i != input() && i != end());
-    assert(i.node_ptr);
-
-    Node* node = new Node(std::move(layer));
-    Node* target = i.node_ptr;
-
-    node->next = target->next;
-    node->prev = target->prev;
-    delete target;
 }

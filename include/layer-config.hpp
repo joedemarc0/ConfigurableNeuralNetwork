@@ -4,32 +4,52 @@
 #include "matrix.h"
 #include "activation.h"
 #include "init.h"
+#include "utils.h"
 #include <cassert>
 
 enum class LayerType { Input, Dense, Dropout };
 
+inline std::string to_string(LayerType type) {
+    switch (type) {
+        case LayerType::Input: return "Input";
+        case LayerType::Dense: return "Dense";
+        case LayerType::Dropout: return "Dropout";
+        default: return "Unknown";
+    }
+}
+
 class Layer {
     protected:
-        size_t inputSize;
-        size_t outputSize;
-        bool built = false;
-
-        Layer(
-            size_t input_size = 0,
-            size_t output_size = 0
-        ) : inputSize(input_size),
-            outputSize(output_size)
+        Layer() = default;
+        Layer(size_t input_size, size_t output_size)
+            : inputSize_(input_size), outputSize_(output_size)
         {}
+
+        std::optional<size_t> inputSize_ = std::nullopt;
+        std::optional<size_t> outputSize_ = std::nullopt;
+        bool built = false;
     
     public:
         virtual Matrix forward(const Matrix& X) = 0;
         virtual Matrix backward(const Matrix& dA) = 0;
-        virtual void build(size_t input_size) = 0;
+        virtual void build() = 0;
 
         virtual LayerType type() const = 0;
-        virtual bool isBuilt() const { return built; }
-        virtual size_t getInputSize() const { return inputSize; }
-        virtual size_t getOutputSize() const { return outputSize; }
+        bool isBuilt() const { return built; }
+
+        void setInputSize(size_t input_size) { inputSize_ = input_size; }
+        bool hasInputSize() const { return inputSize_.has_value(); }
+        bool hasOutputSize() const { return outputSize_.has_value(); }
+
+        size_t inputSize() const {
+            ASSERT(inputSize_.has_value(), "Input size accessed before it was set");
+            return *inputSize_;
+        }
+
+        size_t outputSize() const {
+            ASSERT(outputSize_.has_value(), "Output size accessed before it was set");
+            return *outputSize_;
+        }
 
         virtual ~Layer() = default;
 }; // Layer Class Template
@@ -40,7 +60,7 @@ class Input : public Layer {
 
         Matrix forward(const Matrix& X) override;
         Matrix backward(const Matrix& dA) override;
-        void build(size_t input_size) override;
+        void build() override;
         LayerType type() const override { return LayerType::Input; }
 }; // Input Class
 
@@ -76,7 +96,7 @@ class Dense : public Layer {
 
         Matrix forward(const Matrix& X) override;
         Matrix backward(const Matrix& dA) override;
-        void build(size_t input_size) override;
+        void build() override;
         LayerType type() const override { return LayerType::Dense; }
 
         const Matrix& getWeights() const { return weights; }
@@ -96,7 +116,7 @@ class Dropout : public Layer {
 
         Matrix forward(const Matrix& X) override;
         Matrix backward(const Matrix& dA) override;
-        void build(size_t input_size) override;
+        void build() override;
         LayerType type() const override { return LayerType::Dropout; }
 
         const Matrix& getMask() const { return mask; }
@@ -107,16 +127,17 @@ class Dropout : public Layer {
 class LayerConfig {
     public:
         LayerConfig();
+        explicit LayerConfig(Input input);
+        ~LayerConfig();
+
+        LayerConfig(LayerConfig&& other) noexcept;
+        LayerConfig& operator=(LayerConfig&& other) noexcept;
+
         LayerConfig(const LayerConfig& other) = delete;
         LayerConfig& operator=(const LayerConfig& other) = delete;
-        ~LayerConfig();
 
         bool empty() const { return head.next == &sTail; }
         size_t size() const { return size_; }
-
-        Input* getInput() const;
-        void setInput(Input input);
-
         std::unique_ptr<Layer>& front() const;
         std::unique_ptr<Layer>& back() const;
         void pop_front();
@@ -178,9 +199,38 @@ class LayerConfig {
 
         template <typename T> void insert(Iterator i, T&& layer);
         template <typename T> void replace(Iterator i, T&& layer);
+
+        // Overloading for loops over LayerConfig Layers since they are ugly and long
+        // Overloads for loops from the first non-Input and from the Input
+        template <typename Fn>
+        void forEach(Iterator start, Iterator end, Fn&& func);
+
+        template <typename Fn>
+        void forEach(Iterator start, Fn&& func) { forEach(start, end(), std::forward<Fn>(func)); }
+
+        template <typename Fn>
+        void forEachLayer(Fn&& func) { forEach(begin(), std::forward<Fn>(func)); }
+
+        template <typename Fn>
+        void forEachFromInput(Fn&& func) { forEach(input(), std::forward<Fn>(func)); }
+
+        void buildLayer(Iterator it);
+        void compile();
+
 }; // LayerConfig Class
 
 
+//template <typename T>
+//LayerConfig::LayerConfig(T&& input) : size_(0)
+/*
+{
+    using LayerT = std::decay_t<T>;
+    static_assert(std::is_same_v<Input, LayerT>, "Must be Input class");
+    head.layer = std::make_unique<LayerT>(std::forward<T>(input));
+    head.next = &sTail;
+    sTail.prev = &head;
+}
+*/
 template <typename T>
 void LayerConfig::push_front(T&& layer) {
     using LayerT = std::decay_t<T>;
@@ -246,7 +296,35 @@ void LayerConfig::replace(Iterator i, T&& layer) {
 
     node->next = target->next;
     node->prev = target->prev;
+
+    node->prev->next = node;
+    node->next->prev = node;
     delete target;
+}
+
+template <typename Fn>
+void LayerConfig::forEach(Iterator start, Iterator end, Fn&& func) {
+    for (auto it = start; it != end; ++it) {
+        func(it);
+    }
+}
+
+
+
+// IMPLEMENT THESE TOO
+inline std::ostream& operator<<(std::ostream& os, const Layer& layer) {
+    os << to_string(layer.type()) << "([" << (layer.isBuilt() ? "built" : "unbuilt") << "], ";
+    layer.hasInputSize() ? os << "shape=(" << layer.inputSize() << ", " : os << "shape=( - , ";
+    layer.hasOutputSize() ? os << layer.outputSize() << "), " : os << "- ), ";
+    // os << getActType()
+    // os << getInitType()
+    return os;
+}
+
+inline std::ostream& operator<<(std::ostream& os, const LayerConfig& config) {
+    config.forEachFromInput([&](LayerConfig::Iterator it) {
+        os << *it << " -> ";
+    });
 }
 
 
