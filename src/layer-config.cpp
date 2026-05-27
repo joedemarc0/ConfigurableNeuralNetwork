@@ -346,7 +346,7 @@ void LayerConfig::compile() {
 // Nested Iterator Class Constructor/ASSignment/Destructor
 // =======================================================
 
-LayerConfig::Iterator::Iterator(const Iterator& other) : node_ptr(other.node_ptr) {}
+LayerConfig::Iterator::Iterator(const Iterator& i) : node_ptr(i.node_ptr) {}
 
 LayerConfig::Iterator& LayerConfig::Iterator::operator=(const Iterator& other) {
     if (this != &other) {
@@ -393,5 +393,83 @@ bool LayerConfig::Iterator::operator==(const Iterator& other) const {
 }
 
 bool LayerConfig::Iterator::operator!=(const Iterator& other) const {
+    return node_ptr != other.node_ptr;
+}
+
+bool LayerConfig::Iterator::operator==(const ConstIterator& other) const {
+    return node_ptr == other.node_ptr;
+}
+
+bool LayerConfig::Iterator::operator!=(const ConstIterator& other) const {
+    return node_ptr != other.node_ptr;
+}
+
+
+// ============================================================
+// Nested ConstIterator Class Constructor/ASSignment/Destructor
+// ============================================================
+
+LayerConfig::ConstIterator::ConstIterator(const ConstIterator& i) : node_ptr(i.node_ptr) {}
+
+LayerConfig::ConstIterator::ConstIterator(const Iterator& i) : node_ptr(i.node_ptr) {}
+
+LayerConfig::ConstIterator& LayerConfig::ConstIterator::operator=(const ConstIterator& other) {
+    if (this != &other) {
+        node_ptr = other.node_ptr;
+    }
+
+    return *this;
+}
+
+LayerConfig::ConstIterator& LayerConfig::ConstIterator::operator=(const Iterator& other) {
+    node_ptr = other.node_ptr;
+    return *this;
+}
+
+LayerConfig::ConstIterator::~ConstIterator() { node_ptr = nullptr; }
+
+
+// ====================================
+// Nested ConstIterator Class Operators
+// ====================================
+
+// Increment/Decrement
+LayerConfig::ConstIterator& LayerConfig::ConstIterator::operator++() {
+    assert(node_ptr);
+    node_ptr = node_ptr->next;
+    return *this;
+}
+
+LayerConfig::ConstIterator& LayerConfig::ConstIterator::operator--() {
+    assert(node_ptr);
+    node_ptr = node_ptr->prev;
+    return *this;
+}
+
+// Dereference
+const Layer& LayerConfig::ConstIterator::operator*() const {
+    assert(node_ptr);
+    return *node_ptr->layer;
+}
+
+const Layer* LayerConfig::ConstIterator::operator->() const {
+    assert(node_ptr);
+    return node_ptr->layer.get();
+}
+
+// Comparison
+bool LayerConfig::ConstIterator::operator==(const ConstIterator& other) const {
+    return node_ptr == other.node_ptr;
+}
+
+bool LayerConfig::ConstIterator::operator!=(const ConstIterator& other) const {
+    return node_ptr != other.node_ptr;
+}
+
+bool LayerConfig::ConstIterator::operator==(const Iterator& other) const {
+    return node_ptr == other.node_ptr;
+}
+
+bool LayerConfig::ConstIterator::operator!=(const Iterator& other) const {
     return node_ptr != other.node_ptr;
 }

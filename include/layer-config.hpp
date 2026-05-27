@@ -9,15 +9,6 @@
 
 enum class LayerType { Input, Dense, Dropout };
 
-inline std::string to_string(LayerType type) {
-    switch (type) {
-        case LayerType::Input: return "Input";
-        case LayerType::Dense: return "Dense";
-        case LayerType::Dropout: return "Dropout";
-        default: return "Unknown";
-    }
-}
-
 class Layer {
     protected:
         Layer() = default;
@@ -164,15 +155,16 @@ class LayerConfig {
         size_t size_;
     
     public:
+        class ConstIterator;
         class Iterator {
             public:
                 Iterator(const Iterator& i);
-                Iterator& operator=(const Iterator& i);
+                Iterator& operator=(const Iterator& other);
                 ~Iterator();
 
                 // Increment/Decrement
-                Iterator& operator--();
                 Iterator& operator++();
+                Iterator& operator--();
 
                 // Dereference
                 std::unique_ptr<Layer>& operator*() const;
@@ -181,6 +173,9 @@ class LayerConfig {
                 // Comparison
                 bool operator==(const Iterator& other) const;
                 bool operator!=(const Iterator& other) const;
+
+                bool operator==(const ConstIterator& other) const;
+                bool operator!=(const ConstIterator& other) const;
             
             private:
                 friend class LayerConfig;
@@ -190,9 +185,44 @@ class LayerConfig {
                 Iterator(Node* p) { node_ptr = p; }
         }; // Iterator Class
 
-        Iterator input() const { return Iterator(&head); }
-        Iterator begin() const { return Iterator(head.next); }
-        Iterator end() const { return Iterator(&sTail); }
+        class ConstIterator {
+            public:
+                ConstIterator(const ConstIterator& i);
+                ConstIterator(const Iterator& i);
+                ConstIterator& operator=(const ConstIterator& other);
+                ConstIterator& operator=(const Iterator& other);
+                ~ConstIterator();
+
+                // Increment/Decrement
+                ConstIterator& operator++();
+                ConstIterator& operator--();
+
+                // Dereference
+                const Layer& operator*() const;
+                const Layer* operator->() const;
+
+                // Comparison
+                bool operator==(const ConstIterator& other) const;
+                bool operator!=(const ConstIterator& other) const;
+
+                bool operator==(const Iterator& other) const;
+                bool operator!=(const Iterator& other) const;
+            
+            private:
+                friend class LayerConfig;
+
+                const Node* node_ptr;
+                ConstIterator() { node_ptr = nullptr; }
+                ConstIterator(const Node* p) { node_ptr = p; }
+        }; // ConstIterator Class
+
+        Iterator input() { return Iterator(&head); }
+        Iterator begin() { return Iterator(head.next); }
+        Iterator end() { return Iterator(&sTail); }
+        ConstIterator input() const { return ConstIterator(&head); }
+        ConstIterator begin() const { return ConstIterator(head.next); }
+        ConstIterator end() const { return ConstIterator(&sTail); }
+
         void erase(Iterator i);
         void insert(Iterator i, std::unique_ptr<Layer> layer);
         void replace(Iterator i, std::unique_ptr<Layer> layer);
@@ -202,17 +232,10 @@ class LayerConfig {
 
         // Overloading for loops over LayerConfig Layers since they are ugly and long
         // Overloads for loops from the first non-Input and from the Input
-        template <typename Fn>
-        void forEach(Iterator start, Iterator end, Fn&& func);
-
-        template <typename Fn>
-        void forEach(Iterator start, Fn&& func) { forEach(start, end(), std::forward<Fn>(func)); }
-
-        template <typename Fn>
-        void forEachLayer(Fn&& func) { forEach(begin(), std::forward<Fn>(func)); }
-
-        template <typename Fn>
-        void forEachFromInput(Fn&& func) { forEach(input(), std::forward<Fn>(func)); }
+        template <typename Fn> void forEach(Iterator start, Iterator end, Fn&& func);
+        template <typename Fn> void forEach(Iterator start, Fn&& func) { forEach(start, end(), std::forward<Fn>(func)); }
+        template <typename Fn> void forEachLayer(Fn&& func) { forEach(begin(), std::forward<Fn>(func)); }
+        template <typename Fn> void forEachFromInput(Fn&& func) { forEach(input(), std::forward<Fn>(func)); }
 
         void buildLayer(Iterator it);
         void compile();
@@ -220,17 +243,6 @@ class LayerConfig {
 }; // LayerConfig Class
 
 
-//template <typename T>
-//LayerConfig::LayerConfig(T&& input) : size_(0)
-/*
-{
-    using LayerT = std::decay_t<T>;
-    static_assert(std::is_same_v<Input, LayerT>, "Must be Input class");
-    head.layer = std::make_unique<LayerT>(std::forward<T>(input));
-    head.next = &sTail;
-    sTail.prev = &head;
-}
-*/
 template <typename T>
 void LayerConfig::push_front(T&& layer) {
     using LayerT = std::decay_t<T>;
@@ -310,6 +322,15 @@ void LayerConfig::forEach(Iterator start, Iterator end, Fn&& func) {
 }
 
 
+// Inline Functions
+inline std::string to_string(LayerType type) {
+    switch (type) {
+        case LayerType::Input: return "Input";
+        case LayerType::Dense: return "Dense";
+        case LayerType::Dropout: return "Dropout";
+        default: return "Unknown";
+    }
+}
 
 // IMPLEMENT THESE TOO
 inline std::ostream& operator<<(std::ostream& os, const Layer& layer) {
@@ -322,7 +343,7 @@ inline std::ostream& operator<<(std::ostream& os, const Layer& layer) {
 }
 
 inline std::ostream& operator<<(std::ostream& os, const LayerConfig& config) {
-    config.forEachFromInput([&](LayerConfig::Iterator it) {
+    const_cast<LayerConfig*>(&config)->forEachFromInput([&](LayerConfig::Iterator it) {
         os << *it << " -> ";
     });
 }
