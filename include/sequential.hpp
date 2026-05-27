@@ -42,7 +42,7 @@ Sequential::Sequential(First&& first, Rest&&... rest) {
     static_assert(std::is_base_of_v<Layer, std::decay_t<First>>, "All arguments must derive from Layer");
 
     if constexpr (std::is_same_v<std::decay_t<First>, Input>) {
-        layerConfig.setInput(std::forward<First>(first));
+        layerConfig = LayerConfig(std::forward<First>(first));
     } else {
         layerConfig.push_back(std::forward<First>(first));
     }
@@ -59,6 +59,11 @@ void Sequential::pushLayers(T&& layer, Rest&&... rest) {
     pushLayers(std::forward<Rest>(rest)...);
 }
 
+
+
+
+
+// IMPLEMENT UGH
 inline std::ostream& operator<<(std::ostream& os, const Sequential& model) {
     return os;
 }

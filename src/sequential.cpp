@@ -9,23 +9,7 @@
 void Sequential::compile() {
     if (state != CompiledState::NONE) return;
     ASSERT(!layerConfig.empty(), "Cannot compile Sequential with zero layers");
-
-    Layer* prev_layer = nullptr;
-    size_t expected_input_size = 0;
-    layerConfig.forEachLayer([&](LayerConfig::Iterator it) {
-        Layer* curr = it.operator->();
-        ASSERT(it->type() != LayerType::Input, "Input layer found after head node");
-
-        if (it == layerConfig.begin()) {
-            prev_layer = curr;
-            return;
-        }
-
-        expected_input_size = prev_layer->getOutputSize();
-        curr->build(expected_input_size);
-        prev_layer = curr;
-    });
-
+    layerConfig.compile();
     state = CompiledState::SEMICOMPILED;
 }
 
@@ -38,13 +22,15 @@ Matrix Sequential::forward(const Matrix& X) {
     switch(state) {
         case CompiledState::NONE: {
             compile();
-            forward(X);
-            break;
+            return forward(X);
         }
 
         case CompiledState::SEMICOMPILED: {
-            layerConfig.input()->build(X.rows());
-            layerConfig.begin()->build(layerConfig.input()->getOutputSize());
+            layerConfig.input()->setInputSize(X.rows());
+            layerConfig.forEach(layerConfig.input(), ++layerConfig.begin(), [&](LayerConfig::Iterator it) {
+                layerConfig.buildLayer(it);
+            });
+
             state = CompiledState::COMPILED;
             break;
         }
