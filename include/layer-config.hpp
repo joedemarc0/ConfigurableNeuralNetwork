@@ -233,9 +233,16 @@ class LayerConfig {
         // Overloading for loops over LayerConfig Layers since they are ugly and long
         // Overloads for loops from the first non-Input and from the Input
         template <typename Fn> void forEach(Iterator start, Iterator end, Fn&& func);
+        template <typename Fn> void forEach(ConstIterator start, ConstIterator end, Fn&& func) const;
+
         template <typename Fn> void forEach(Iterator start, Fn&& func) { forEach(start, end(), std::forward<Fn>(func)); }
+        template <typename Fn> void forEach(ConstIterator start, Fn&& func) const { forEach(start, end(), std::forward<Fn>(func)); }
+
         template <typename Fn> void forEachLayer(Fn&& func) { forEach(begin(), std::forward<Fn>(func)); }
+        template <typename Fn> void forEachLayer(Fn&& func) const { forEach(begin(), std::forward<Fn>(func)); }
+
         template <typename Fn> void forEachFromInput(Fn&& func) { forEach(input(), std::forward<Fn>(func)); }
+        template <typename Fn> void forEachFromInput(Fn&& func) const { forEach(input(), std::forward<Fn>(func)); }
 
         void buildLayer(Iterator it);
         void compile();
@@ -321,6 +328,13 @@ void LayerConfig::forEach(Iterator start, Iterator end, Fn&& func) {
     }
 }
 
+template <typename Fn>
+void LayerConfig::forEach(ConstIterator start, ConstIterator end, Fn&& func) const {
+    for (auto it = start; it != end; ++it) {
+        func(it);
+    }
+}
+
 
 // Inline Functions
 inline std::string to_string(LayerType type) {
@@ -343,9 +357,11 @@ inline std::ostream& operator<<(std::ostream& os, const Layer& layer) {
 }
 
 inline std::ostream& operator<<(std::ostream& os, const LayerConfig& config) {
-    const_cast<LayerConfig*>(&config)->forEachFromInput([&](LayerConfig::Iterator it) {
+    config.forEachFromInput([&](LayerConfig::ConstIterator it) {
         os << *it << " -> ";
     });
+
+    return os;
 }
 
 
