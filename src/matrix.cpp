@@ -8,13 +8,28 @@
 Matrix::Matrix() : rows_(0), cols_(0) {}
 
 Matrix::Matrix(size_t rows, size_t cols)
-    : rows_(rows), cols_(cols), data_(rows * cols, 0.0) {}
+    : rows_(rows), cols_(cols), data_(rows * cols, 0.0)
+{}
 
 Matrix::Matrix(size_t rows, size_t cols, double value)
-    : rows_(rows), cols_(cols), data_(rows * cols, value) {}
+    : rows_(rows), cols_(cols), data_(rows * cols, value)
+{}
+
+Matrix::Matrix(std::optional<size_t> rows, std::optional<size_t> cols) {
+    ASSERT(rows.has_value(), "Matrix being constructed with uninitialized row number");
+    ASSERT(cols.has_value(), "Matrix being constructed with uninitialized col number");
+    *this = Matrix(*rows, *cols);
+}
+
+Matrix::Matrix(std::optional<size_t> rows, std::optional<size_t> cols, double value) {
+    ASSERT(rows.has_value(), "Matrix being constructed with uninitialized row number");
+    ASSERT(cols.has_value(), "Matrix being constructed with uninitialized col number");
+    *this = Matrix(*rows, *cols, value);
+}
 
 Matrix::Matrix(Matrix&& other) noexcept
-    : rows_(other.rows_), cols_(other.cols_), data_(other.data_) {
+    : rows_(other.rows_), cols_(other.cols_), data_(other.data_)
+{
     other.rows_ = other.cols_ = 0;
     other.data_.clear();
 }
@@ -201,7 +216,7 @@ Matrix Matrix::transpose() const {
     for (size_t i = 0; i < rows_; i += BLOCK) {
         for (size_t j = 0; j < cols_; j += BLOCK) {
             for (size_t ii = i; ii < std::min(i + BLOCK, rows_); ++ii) {
-                for (size_t jj = j; j < std::min(j + BLOCK, cols_); ++jj) {
+                for (size_t jj = j; jj < std::min(j + BLOCK, cols_); ++jj) {
                     r[jj * rows_ + ii] = a[ii * cols_ + jj];
                 }
             }
@@ -251,8 +266,6 @@ void Matrix::fill(double value) {
 // Static Matrices
 Matrix Matrix::mask(size_t rows, size_t cols, double rate) {
     Matrix result(rows, cols);
-    const size_t n = rows * cols;
-
     static std::mt19937 rng(std::random_device{}());
     std::bernoulli_distribution dis(1.0 - rate);
     for (double& v : result.data_) v = dis(rng);

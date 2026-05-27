@@ -16,6 +16,8 @@ class Matrix {
         Matrix();
         Matrix(size_t rows, size_t cols);
         Matrix(size_t rows, size_t cols, double value);
+        Matrix(std::optional<size_t> rows, std::optional<size_t> cols);
+        Matrix(std::optional<size_t> rows, std::optional<size_t> cols, double value);
         Matrix(Matrix&& other) noexcept;
         Matrix(const Matrix& other) = default;
 
