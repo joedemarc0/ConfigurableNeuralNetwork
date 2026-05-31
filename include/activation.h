@@ -15,7 +15,7 @@
 
 
 namespace Activations {
-    enum class ActivationType{ RELU, LEAKY_RELU, SOFTMAX };
+    enum class ActivationType{ LINEAR, RELU, LEAKY_RELU, SOFTMAX };
     Matrix activate(const Matrix& x, ActivationType type);
     Matrix deriv_activate(const Matrix& x, ActivationType type);
     std::string to_string(ActivationType type);

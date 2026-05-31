@@ -7,6 +7,7 @@ using namespace Activations;
 
 Matrix Activations::activate(const Matrix& x, ActivationType type) {
     switch(type) {
+        case ActivationType::LINEAR: return x;
         case ActivationType::RELU: return x.apply([](double v) { return std::max(0.0, v); });
         case ActivationType::LEAKY_RELU: {
             constexpr double alpha = 0.01;
