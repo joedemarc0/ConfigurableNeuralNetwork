@@ -7,7 +7,13 @@
 // Input Layer Implementation
 // ==========================
 
-Input::Input(size_t input_size) : Layer() { inputSize_ = input_size; }
+Input::Input(size_t input_size)
+    : Layer()
+{
+    ASSERT(input_size != 0, "Cannot create Input with size = 0");
+    inputSize_ = input_size;
+}
+
 Matrix Input::forward(const Matrix& X) { return X; }
 Matrix Input::backward(const Matrix& dA) { return dA; }
 void Input::build() {
@@ -22,6 +28,15 @@ void Input::build() {
 // ===========================
 
 // Constructors
+Dense::Dense(size_t output_size)
+    : Layer(),
+    actType(Activations::ActivationType::LINEAR),
+    initType(InitType::NONE)
+{
+    ASSERT(output_size != 0, "Cannot create Dense with output size = 0");
+    outputSize_ = output_size;
+}
+
 Dense::Dense(
     size_t output_size,
     Activations::ActivationType act_type,
@@ -30,6 +45,7 @@ Dense::Dense(
     actType(act_type),
     initType(init_type)
 {
+    ASSERT(output_size != 0, "Cannot create Dense with output size = 0");
     outputSize_ = output_size;
 }
 
@@ -41,7 +57,10 @@ Dense::Dense(
 ) : Layer(input_size, output_size),
     actType(act_type),
     initType(init_type)
-{}
+{
+    ASSERT(input_size != 0, "Cannot create Dense with size = 0");
+    ASSERT(output_size != 0, "Cannot create Dense with output size = 0");
+}
 
 
 // Dense Layer Private Functions
@@ -340,6 +359,19 @@ void LayerConfig::compile() {
         buildLayer(it);
     });
 }
+
+Matrix LayerConfig::forward(const Matrix& X) {
+    Matrix A = X;
+    forEachFromInput([&](Iterator it) { A = it->forward(A); });
+    return A;
+}
+
+// qkdlaksfl kflkas lfk
+
+// IMPLEMENT WHEN WE DO LOSS IMPLEMENTATION
+
+// kajsndkjndfkjnaskdjfnks
+void LayerConfig::backward(const Matrix& y_true, double learning_rate) {}
 
 
 // =======================================================

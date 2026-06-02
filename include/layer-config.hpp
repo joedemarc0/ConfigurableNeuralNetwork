@@ -24,13 +24,12 @@ class Layer {
         virtual Matrix forward(const Matrix& X) = 0;
         virtual Matrix backward(const Matrix& dA) = 0;
         virtual void build() = 0;
-
         virtual LayerType type() const = 0;
-        bool isBuilt() const { return built; }
 
         void setInputSize(size_t input_size) { inputSize_ = input_size; }
         bool hasInputSize() const { return inputSize_.has_value(); }
         bool hasOutputSize() const { return outputSize_.has_value(); }
+        bool isBuilt() const { return built; }
 
         size_t inputSize() const {
             ASSERT(inputSize_.has_value(), "Input size accessed before it was set");
@@ -45,6 +44,12 @@ class Layer {
         virtual ~Layer() = default;
 }; // Layer Class Template
 
+class Trainable {
+    public:
+        virtual void update(double learning_rate) = 0;
+        virtual ~Trainable() = default;
+};
+
 class Input : public Layer {
     public:
         Input(size_t input_size);
@@ -55,7 +60,7 @@ class Input : public Layer {
         LayerType type() const override { return LayerType::Input; }
 }; // Input Class
 
-class Dense : public Layer {
+class Dense : public Layer, public Trainable {
     private:
         Matrix weights;
         Matrix biases;
@@ -72,6 +77,8 @@ class Dense : public Layer {
         void updateParams(double learning_rate);
 
     public:
+        Dense(size_t output_size);
+
         Dense(
             size_t output_size,
             Activations::ActivationType act_type,
@@ -89,6 +96,7 @@ class Dense : public Layer {
         Matrix backward(const Matrix& dA) override;
         void build() override;
         LayerType type() const override { return LayerType::Dense; }
+        void update(double learning_rate) override { updateParams(learning_rate); }
 
         const Matrix& getWeights() const { return weights; }
         const Matrix& getBiases() const { return biases; }
@@ -111,7 +119,6 @@ class Dropout : public Layer {
         LayerType type() const override { return LayerType::Dropout; }
 
         const Matrix& getMask() const { return mask; }
-
 }; // Dropout Class
 
 
@@ -139,6 +146,8 @@ class LayerConfig {
 
         template <typename T> void push_front(T&& layer);
         template <typename T> void push_back(T&& layer);
+        template <typename T, typename... Rest> void push_layers(T&& layer, Rest&&... rest);
+        void push_layers() {}
     
     private:
         struct Node {
@@ -244,9 +253,13 @@ class LayerConfig {
         template <typename Fn> void forEachFromInput(Fn&& func) { forEach(input(), std::forward<Fn>(func)); }
         template <typename Fn> void forEachFromInput(Fn&& func) const { forEach(input(), std::forward<Fn>(func)); }
 
+        template <typename Fn> void forEachBackwards(Iterator end, Iterator start, Fn&& func);
+        template <typename Fn> void forEachBackwards(ConstIterator end, ConstIterator start, Fn&& func) const;
+
         void buildLayer(Iterator it);
         void compile();
-
+        Matrix forward(const Matrix& X);
+        void backward(const Matrix& y_true, double learning_rate);
 }; // LayerConfig Class
 
 
@@ -278,6 +291,15 @@ void LayerConfig::push_back(T&& layer) {
     sTail.prev = node;
 
     ++size_;
+}
+
+template <typename T, typename... Rest>
+void LayerConfig::push_layers(T&& layer, Rest&&... rest) {
+    static_assert(std::is_base_of_v<Layer, std::decay_t<T>>, "All arguments must derive from Layer");
+    static_assert(!std::is_same_v<std::decay_t<T>, Input>, "Layer after First must not be Input");
+
+    push_back(std::forward<T>(layer));
+    push_layers(std::forward<Rest>(rest)...);
 }
 
 template <typename T>
@@ -323,16 +345,22 @@ void LayerConfig::replace(Iterator i, T&& layer) {
 
 template <typename Fn>
 void LayerConfig::forEach(Iterator start, Iterator end, Fn&& func) {
-    for (auto it = start; it != end; ++it) {
-        func(it);
-    }
+    for (auto it = start; it != end; ++it) func(it);
 }
 
 template <typename Fn>
 void LayerConfig::forEach(ConstIterator start, ConstIterator end, Fn&& func) const {
-    for (auto it = start; it != end; ++it) {
-        func(it);
-    }
+    for (auto it = start; it != end; ++it) func(it);
+}
+
+template <typename Fn>
+void LayerConfig::forEachBackwards(Iterator end, Iterator start, Fn&& func) {
+    for (auto it = end; it != start; --it) func(it);
+}
+
+template <typename Fn>
+void LayerConfig::forEachBackwards(ConstIterator end, ConstIterator start, Fn&& func) const {
+    for (auto it = end; it != start; --it) func(it);
 }
 
 
