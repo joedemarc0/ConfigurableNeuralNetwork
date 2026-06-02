@@ -38,8 +38,15 @@ Matrix Sequential::forward(const Matrix& X) {
         case CompiledState::COMPILED: { break; }
     }
 
-    Matrix A = X;
-    layerConfig.forEachFromInput([&](LayerConfig::Iterator it) { A = it->forward(A); });
-    lastOutput = A;
+    lastOutput = layerConfig.forward(X);
     return lastOutput;
+}
+
+void Sequential::backward(const Matrix& y_true, double learning_rate) {
+    // size_t batch_size = y_true.cols();
+    Matrix dA = lastOutput - y_true;
+    layerConfig.forEachBackwards(layerConfig.end(), layerConfig.input(), [&](LayerConfig::Iterator it) {
+        dA = it->backward(dA);
+        if (auto* t = dynamic_cast<Trainable*>(it.operator->())) t->update(learning_rate);
+    });
 }
