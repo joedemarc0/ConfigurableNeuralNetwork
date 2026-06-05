@@ -1,10 +1,10 @@
 #ifndef LAYER_CONFIG_HPP
 #define LAYER_CONFIG_HPP
 
-#include "matrix.h"
-#include "activation.h"
-#include "init.h"
-#include "utils.h"
+#include "matrix.hpp"
+#include "activation.hpp"
+#include "init.hpp"
+#include "utils.hpp"
 #include <cassert>
 
 enum class LayerType { Input, Dense, Dropout };
