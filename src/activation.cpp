@@ -1,4 +1,4 @@
-#include "activation.h"
+#include "activation.hpp"
 #include <cmath>
 #include <algorithm>
 

@@ -1,5 +1,5 @@
-#include "matrix.h"
-#include "utils.h"
+#include "matrix.hpp"
+#include "utils.hpp"
 #include <stdexcept>
 #include <random>
 

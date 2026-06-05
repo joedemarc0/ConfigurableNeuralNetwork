@@ -1,5 +1,5 @@
 #include "sequential.hpp"
-#include "utils.h"
+#include "utils.hpp"
 
 
 // =================================
@@ -42,6 +42,7 @@ Matrix Sequential::forward(const Matrix& X) {
     return lastOutput;
 }
 
+/*
 void Sequential::backward(const Matrix& y_true, double learning_rate) {
     // size_t batch_size = y_true.cols();
     Matrix dA = lastOutput - y_true;
@@ -50,3 +51,4 @@ void Sequential::backward(const Matrix& y_true, double learning_rate) {
         if (auto* t = dynamic_cast<Trainable*>(it.operator->())) t->update(learning_rate);
     });
 }
+*/
