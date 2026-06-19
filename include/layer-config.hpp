@@ -70,7 +70,7 @@ class Dense : public Layer, public Trainable {
         Matrix dWeights;
         Matrix dbiases;
 
-        Activations::ActivationType actType;
+        std::unique_ptr<Activation> activation;
         InitType initType;
 
         void initialize();
@@ -81,17 +81,25 @@ class Dense : public Layer, public Trainable {
 
         Dense(
             size_t output_size,
-            Activations::ActivationType act_type,
+            std::unique_ptr<Activation> act,
             InitType init_type
         );
 
         Dense(
             size_t input_size,
             size_t output_size,
-            Activations::ActivationType act_type,
+            std::unique_ptr<Activation> act,
             InitType init_type
         );
 
+        template <typename T>
+        Dense(
+            size_t output_size,
+            T&& act,
+            InitType init_type
+        );
+
+        // Need a SetActivation Function FOR SURE.  aldknalkndlknslknsldknslaknlakndlkaalskdnlakdslakndlkansldknalkdnalksnd
         Matrix forward(const Matrix& X) override;
         Matrix backward(const Matrix& dA) override;
         void build() override;
@@ -101,7 +109,7 @@ class Dense : public Layer, public Trainable {
         const Matrix& getWeights() const { return weights; }
         const Matrix& getBiases() const { return biases; }
         const Matrix& getZ() const { return preActivation; }
-        Activations::ActivationType getActivationType() const { return actType; }
+        ActivationType getActivationType() const { return activation->type(); }
         InitType getInitType() const { return initType; }
 }; // Dense Class
 
@@ -239,6 +247,9 @@ class LayerConfig {
         template <typename T> void insert(Iterator i, T&& layer);
         template <typename T> void replace(Iterator i, T&& layer);
 
+        void buildLayer(Iterator it);
+        void compile();
+
         // Overloading for loops over LayerConfig Layers since they are ugly and long
         // Overloads for loops from the first non-Input and from the Input
         template <typename Fn> void forEach(Iterator start, Iterator end, Fn&& func);
@@ -255,11 +266,6 @@ class LayerConfig {
 
         template <typename Fn> void forEachBackwards(Iterator end, Iterator start, Fn&& func);
         template <typename Fn> void forEachBackwards(ConstIterator end, ConstIterator start, Fn&& func) const;
-
-        void buildLayer(Iterator it);
-        void compile();
-        Matrix forward(const Matrix& X);
-        void backward(const Matrix& y_true, double learning_rate);
 }; // LayerConfig Class
 
 

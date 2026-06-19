@@ -30,7 +30,7 @@ void Input::build() {
 // Constructors
 Dense::Dense(size_t output_size)
     : Layer(),
-    actType(Activations::ActivationType::LINEAR),
+    activation(),
     initType(InitType::NONE)
 {
     ASSERT(output_size != 0, "Cannot create Dense with output size = 0");
@@ -39,10 +39,10 @@ Dense::Dense(size_t output_size)
 
 Dense::Dense(
     size_t output_size,
-    Activations::ActivationType act_type,
+    std::unique_ptr<Activation> act,
     InitType init_type
 ) : Layer(),
-    actType(act_type),
+    activation(std::move(act)),
     initType(init_type)
 {
     ASSERT(output_size != 0, "Cannot create Dense with output size = 0");
@@ -52,10 +52,10 @@ Dense::Dense(
 Dense::Dense(
     size_t input_size,
     size_t output_size,
-    Activations::ActivationType act_type,
+    std::unique_ptr<Activation> act,
     InitType init_type
 ) : Layer(input_size, output_size),
-    actType(act_type),
+    activation(std::move(act)),
     initType(init_type)
 {
     ASSERT(input_size != 0, "Cannot create Dense with size = 0");
@@ -87,7 +87,7 @@ Matrix Dense::forward(const Matrix& X) {
     input = X;
     Matrix Z = (weights * X) + biases;
     preActivation = Z;
-    Matrix A = Activations::activate(Z, actType);
+    Matrix A = activation->activate(Z);
     return A;
 }
 
@@ -95,11 +95,10 @@ Matrix Dense::backward(const Matrix& dA) {
     size_t batch_size = dA.cols();
     Matrix dZ;
 
-    if (actType == Activations::ActivationType::SOFTMAX) {
-        dZ = dA;
-    } else {
-        Matrix sigma_prime = Activations::deriv_activate(preActivation, actType);
-        dZ = dA.hadamard(sigma_prime);
+    if (auto* t = dynamic_cast<DiagonalJacobian*>(activation.get())) {
+        dZ = dA.hadamard(t->deriv_activate(preActivation));
+    } else if (auto* t = dynamic_cast<NonDiagonalJacobian*>(activation.get())) {
+        dZ = t->jacobian_transpose(input) * dA;
     }
 
     dWeights = dZ * input.transpose();
@@ -359,19 +358,6 @@ void LayerConfig::compile() {
         buildLayer(it);
     });
 }
-
-Matrix LayerConfig::forward(const Matrix& X) {
-    Matrix A = X;
-    forEachFromInput([&](Iterator it) { A = it->forward(A); });
-    return A;
-}
-
-// qkdlaksfl kflkas lfk
-
-// IMPLEMENT WHEN WE DO LOSS IMPLEMENTATION
-
-// kajsndkjndfkjnaskdjfnks
-void LayerConfig::backward(const Matrix& y_true, double learning_rate) {}
 
 
 // =======================================================
