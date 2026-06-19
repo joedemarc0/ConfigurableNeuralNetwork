@@ -2,8 +2,6 @@
 #include <cmath>
 #include <algorithm>
 
-using namespace Activations;
-
 
 Matrix Activations::activate(const Matrix& x, ActivationType type) {
     switch(type) {
@@ -61,4 +59,22 @@ std::string Activations::to_string(ActivationType type) {
         case ActivationType::SOFTMAX: return "SOFTMAX";
         default: throw std::runtime_error("Activation type unspecified");
     }
+}
+
+
+Matrix ReLU::activate(const Matrix& X) {
+    return X.apply([](double v) { return std::max(0.0, v); });
+}
+
+Matrix LeakyReLU::activate(const Matrix& X) {
+    constexpr double alpha = 0.01;
+    return X.apply([](double v) { return v > 0.0 ? v : alpha * v; });
+}
+
+
+
+
+
+Matrix Softmax::activate(const Matrix& X) {
+    return X;
 }
