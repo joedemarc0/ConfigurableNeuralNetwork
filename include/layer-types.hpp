@@ -66,6 +66,7 @@ class Dense : public Layer, public Trainable {
         Matrix biases;
         Matrix input;
         Matrix preActivation;
+        Matrix output;
 
         Matrix dWeights;
         Matrix dbiases;

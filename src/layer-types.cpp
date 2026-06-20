@@ -84,25 +84,21 @@ Matrix Dense::forward(const Matrix& X) {
     input = X;
     Matrix Z = (weights * X) + biases;
     preActivation = Z;
-    Matrix A = activation->activate(Z);
-    return A;
+    output = activation->forward(Z);
+    return output;
 }
 
 Matrix Dense::backward(const Matrix& dA) {
-    size_t batch_size = dA.cols();
     Matrix dZ;
 
     if (auto* t = dynamic_cast<DiagonalJacobian*>(activation.get())) {
         dZ = dA.hadamard(t->deriv_activate(preActivation));
     } else if (auto* t = dynamic_cast<NonDiagonalJacobian*>(activation.get())) {
-        dZ = t->jacobian_transpose(input) * dA;
+        dZ = t->jacobian_transpose(output) * dA;
     }
 
     dWeights = dZ * input.transpose();
-    dWeights /= batch_size;
-
     dbiases = dZ.sumCols();
-    dbiases /= batch_size;
 
     return weights.transpose() * dZ;
 }
