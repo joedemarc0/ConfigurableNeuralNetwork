@@ -10,6 +10,7 @@ class Matrix {
     private:
         size_t rows_, cols_;
         std::vector<double> data_;
+        size_t size_;
     
     public:
         // Constructors
@@ -24,6 +25,7 @@ class Matrix {
         // Getters
         size_t rows() const { return rows_; }
         size_t cols() const { return cols_; }
+        size_t size() const { return size_; }
         double* data() { return data_.data(); }
         const double* data() const { return data_.data(); }
 

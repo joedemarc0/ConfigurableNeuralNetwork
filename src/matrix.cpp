@@ -5,15 +5,15 @@
 
 
 // Matrix Class Constructors
-Matrix::Matrix() : rows_(0), cols_(0) {}
+Matrix::Matrix() : rows_(0), cols_(0) { size_ = rows_ * cols_; }
 
 Matrix::Matrix(size_t rows, size_t cols)
     : rows_(rows), cols_(cols), data_(rows * cols, 0.0)
-{}
+{ size_ = rows * cols; }
 
 Matrix::Matrix(size_t rows, size_t cols, double value)
     : rows_(rows), cols_(cols), data_(rows * cols, value)
-{}
+{ size_ = rows * cols; }
 
 Matrix::Matrix(std::optional<size_t> rows, std::optional<size_t> cols) {
     ASSERT(rows.has_value(), "Matrix being constructed with uninitialized row number");
@@ -31,6 +31,7 @@ Matrix::Matrix(Matrix&& other) noexcept
     : rows_(other.rows_), cols_(other.cols_), data_(other.data_)
 {
     other.rows_ = other.cols_ = 0;
+    other.size_ = 0;
     other.data_.clear();
 }
 
@@ -40,8 +41,10 @@ Matrix& Matrix::operator=(Matrix&& other) noexcept {
     if (this != &other) {
         rows_ = other.rows_;
         cols_ = other.cols_;
+        size_ = other.size_;
         data_ = std::move(other.data_);
         other.rows_ = other.cols_ = 0;
+        other.size_ = 0;
         other.data_.clear();
     }
 
